@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Football Stats</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+
+    header {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      padding: 30px 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 36px;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      color: #dcfce7;
+      font-size: 16px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: #1e293b;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
+    }
+
+    .card h3 {
+      color: #94a3b8;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    .card .number {
+      font-size: 32px;
+      font-weight: bold;
+      color: #22c55e;
+    }
+
+    .section-title {
+      margin-bottom: 15px;
+      font-size: 24px;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    input, select {
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      outline: none;
+      background: #334155;
+      color: white;
+    }
+
+    input {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    thead {
+      background: #334155;
+    }
+
+    th, td {
+      padding: 14px;
+      text-align: center;
+      border-bottom: 1px solid #334155;
+    }
+
+    th {
+      color: #cbd5e1;
+      cursor: pointer;
+    }
+
+    tbody tr:hover {
+      background: #273449;
+    }
+
+    .team {
+      text-align: left;
+      font-weight: bold;
+    }
+
+    .rank {
+      color: #22c55e;
+      font-weight: bold;
+    }
+
+    .win {
+      color: #22c55e;
+    }
+
+    .draw {
+      color: #facc15;
+    }
+
+    .loss {
+      color: #ef4444;
+    }
+
+    .footer {
+      text-align: center;
+      margin: 40px 0 20px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    @media (max-width: 700px) {
+      header h1 {
+        font-size: 28px;
+      }
+
+      th, td {
+        padding: 10px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Football Stats</h1>
+    <p>팀 순위, 승점, 득점, 실점 통계를 한눈에 확인하세요</p>
+  </header>
+
+  <div class="container">
+    <div class="cards">
+      <div class="card">
+        <h3>총 팀 수</h3>
+        <div class="number" id="totalTeams">0</div>
+      </div>
+
+      <div class="card">
+        <h3>총 경기 수</h3>
+        <div class="number" id="totalMatches">0</div>
+      </div>
+
+      <div class="card">
+        <h3>총 득점</h3>
+        <div class="number" id="totalGoals">0</div>
+      </div>
+
+      <div class="card">
+        <h3>평균 득점</h3>
+        <div class="number" id="avgGoals">0</div>
+      </div>
+    </div>
+
+    <h2 class="section-title">리그 순위표</h2>
+
+    <div class="controls">
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="팀 이름 검색"
+        onkeyup="renderTable()"
+      />
+
+      <select id="leagueSelect" onchange="renderTable()">
+        <option value="all">전체 리그</option>
+        <option value="EPL">EPL</option>
+        <option value="La Liga">La Liga</option>
+        <option value="K League">K League</option>
+      </select>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>순위</th>
+          <th>팀</th>
+          <th>리그</th>
+          <th onclick="sortTable('played')">경기</th>
+          <th onclick="sortTable('win')">승</th>
+          <th onclick="sortTable('draw')">무</th>
+          <th onclick="sortTable('loss')">패</th>
+          <th onclick="sortTable('goalsFor')">득점</th>
+          <th onclick="sortTable('goalsAgainst')">실점</th>
+          <th onclick="sortTable('points')">승점</th>
+        </tr>
+      </thead>
+
+      <tbody id="teamTable"></tbody>
+    </table>
+
+    <div class="footer">
+      © 2026 Football Stats. Sample data website.
+    </div>
+  </div>
+
+  <script>
+    const teams = [
+      {
+        name: "Manchester City",
+        league: "EPL",
+        played: 20,
+        win: 15,
+        draw: 3,
+        loss: 2,
+        goalsFor: 48,
+        goalsAgainst: 18
+      },
+      {
+        name: "Arsenal",
+        league: "EPL",
+        played: 20,
+        win: 14,
+        draw: 4,
+        loss: 2,
+        goalsFor: 42,
+        goalsAgainst: 17
+      },
+      {
+        name: "Liverpool",
+        league: "EPL",
+        played: 20,
+        win: 13,
+        draw: 5,
+        loss: 2,
+        goalsFor: 45,
+        goalsAgainst: 21
+      },
+      {
+        name: "Real Madrid",
+        league: "La Liga",
+        played: 20,
+        win: 16,
+        draw: 2,
+        loss: 2,
+        goalsFor: 50,
+        goalsAgainst: 16
+      },
+      {
+        name: "Barcelona",
+        league: "La Liga",
+        played: 20,
+        win: 13,
+        draw: 4,
+        loss: 3,
+        goalsFor: 44,
+        goalsAgainst: 22
+      },
+      {
+        name: "Atletico Madrid",
+        league: "La Liga",
+        played: 20,
+        win: 12,
+        draw: 5,
+        loss: 3,
+        goalsFor: 39,
+        goalsAgainst: 20
+      },
+      {
+        name: "Ulsan HD",
+        league: "K League",
+        played: 20,
+        win: 12,
+        draw: 4,
+        loss: 4,
+        goalsFor: 35,
+        goalsAgainst: 21
+      },
+      {
+        name: "Jeonbuk Hyundai",
+        league: "K League",
+        played: 20,
+        win: 10,
+        draw: 6,
+        loss: 4,
+        goalsFor: 31,
+        goalsAgainst: 23
+      },
+      {
+        name: "FC Seoul",
+        league: "K League",
+        played: 20,
+        win: 9,
+        draw: 6,
+        loss: 5,
+        goalsFor: 29,
+        goalsAgainst: 25
+      }
+    ];
+
+    let currentSort = "points";
+
+    function calculatePoints(team) {
+      return team.win * 3 + team.draw;
+    }
+
+    function sortTable(key) {
+      currentSort = key;
+      renderTable();
+    }
+
+    function renderTable() {
+      const tableBody = document.getElementById("teamTable");
+      const searchValue = document.getElementById("searchInput").value.toLowerCase();
+      const selectedLeague = document.getElementById("leagueSelect").value;
+
+      let filteredTeams = teams.filter(team => {
+        const matchesSearch = team.name.toLowerCase().includes(searchValue);
+        const matchesLeague = selectedLeague === "all" || team.league === selectedLeague;
+
+        return matchesSearch && matchesLeague;
+      });
+
+      filteredTeams.sort((a, b) => {
+        if (currentSort === "points") {
+          return calculatePoints(b) - calculatePoints(a);
+        }
+
+        return b[currentSort] - a[currentSort];
+      });
+
+      tableBody.innerHTML = "";
+
+      filteredTeams.forEach((team, index) => {
+        const points = calculatePoints(team);
+
+        const row = `
+          <tr>
+            <td class="rank">${index + 1}</td>
+            <td class="team">${team.name}</td>
+            <td>${team.league}</td>
+            <td>${team.played}</td>
+            <td class="win">${team.win}</td>
+            <td class="draw">${team.draw}</td>
+            <td class="loss">${team.loss}</td>
+            <td>${team.goalsFor}</td>
+            <td>${team.goalsAgainst}</td>
+            <td><strong>${points}</strong></td>
+          </tr>
+        `;
+
+        tableBody.innerHTML += row;
+      });
+
+      updateSummary(filteredTeams);
+    }
+
+    function updateSummary(data) {
+      const totalTeams = data.length;
+      const totalMatches = data.reduce((sum, team) => sum + team.played, 0);
+      const totalGoals = data.reduce((sum, team) => sum + team.goalsFor, 0);
+      const avgGoals = totalMatches === 0 ? 0 : (totalGoals / totalMatches).toFixed(2);
+
+      document.getElementById("totalTeams").textContent = totalTeams;
+      document.getElementById("totalMatches").textContent = totalMatches;
+      document.getElementById("totalGoals").textContent = totalGoals;
+      document.getElementById("avgGoals").textContent = avgGoals;
+    }
+
+    renderTable();
+  </script>
+</body>
+</html>
