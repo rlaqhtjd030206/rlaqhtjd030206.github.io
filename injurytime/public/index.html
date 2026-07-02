@@ -3,9 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>축구 통계 사이트</title>
+
+  <title>INJURY TIME</title>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       background: #0f172a;
@@ -15,31 +20,55 @@
 
     header {
       background: #16a34a;
-      padding: 30px;
+      padding: 32px 20px;
       text-align: center;
     }
 
     header h1 {
+      margin: 0 0 10px;
+      font-size: 34px;
+    }
+
+    header p {
       margin: 0;
+      color: #dcfce7;
     }
 
     main {
-      max-width: 1100px;
+      max-width: 1200px;
       margin: 30px auto;
       padding: 0 20px;
     }
 
-    .controls {
-      margin-bottom: 20px;
-      display: flex;
-      gap: 10px;
+    .panel {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 30px;
     }
 
-    select, button {
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    select,
+    button,
+    input {
       padding: 10px 14px;
       border-radius: 8px;
       border: none;
       font-size: 15px;
+    }
+
+    select,
+    input {
+      background: #f8fafc;
+      color: #0f172a;
     }
 
     button {
@@ -49,22 +78,43 @@
       cursor: pointer;
     }
 
+    button:hover {
+      background: #16a34a;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 24px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
     table {
       width: 100%;
+      min-width: 850px;
       border-collapse: collapse;
       background: #1e293b;
       border-radius: 12px;
       overflow: hidden;
     }
 
-    th, td {
+    th,
+    td {
       padding: 12px;
       text-align: center;
       border-bottom: 1px solid #334155;
+      white-space: nowrap;
     }
 
     th {
       background: #334155;
+      color: #e2e8f0;
+    }
+
+    tr:hover {
+      background: #273449;
     }
 
     .team {
@@ -86,9 +136,45 @@
       font-weight: bold;
     }
 
-    .error {
+    .message {
       margin-top: 15px;
       color: #f87171;
+    }
+
+    .success-message {
+      color: #86efac;
+    }
+
+    .score {
+      font-weight: bold;
+      color: #facc15;
+    }
+
+    .small {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 26px;
+      }
+
+      main {
+        padding: 0 12px;
+      }
+
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      select,
+      button,
+      input {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -96,85 +182,159 @@
 <body>
   <header>
     <h1>축구 통계 사이트</h1>
-    <p>API 기반 리그 순위표</p>
+    <p>API 기반 리그 순위표 · 경기 일정</p>
   </header>
 
   <main>
-    <div class="controls">
+    <section class="panel">
+      <div class="controls">
         <select id="competition">
-            <option value="PL">Premier League</option>
-            <option value="PD">La Liga</option>
-            <option value="BL1">Bundesliga</option>
-            <option value="SA">Serie A</option>
-            <option value="FL1">Ligue 1</option>
+          <option value="PL">Premier League</option>
+          <option value="PD">La Liga</option>
+          <option value="BL1">Bundesliga</option>
+          <option value="SA">Serie A</option>
+          <option value="FL1">Ligue 1</option>
         </select>
 
         <button onclick="loadStandings()">순위표 불러오기</button>
         <button onclick="loadMatches()">경기 일정 불러오기</button>
-    </div>
+      </div>
 
-    <h2 id="leagueTitle">리그 순위표</h2>
+      <p class="small">
+        반드시 <strong>http://localhost:3000</strong> 주소에서 실행해야 API가 작동합니다.
+        GitHub Pages 주소에서는 server.js가 실행되지 않습니다.
+      </p>
+    </section>
 
-    <table>
-      <thead>
-        <tr>
-          <th>순위</th>
-          <th>팀</th>
-          <th>경기</th>
-          <th>승</th>
-          <th>무</th>
-          <th>패</th>
-          <th>득점</th>
-          <th>실점</th>
-          <th>득실차</th>
-          <th>승점</th>
-        </tr>
-      </thead>
+    <section class="panel">
+      <h2 id="leagueTitle">리그 순위표</h2>
 
-      <tbody id="standingsTable"></tbody>
-    </table>
-
-    <h2 style="margin-top: 40px;">경기 일정</h2>
-
-    <table>
-        <thead>
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-                <th>날짜</th>
-                <th>라운드</th>
-                <th>홈팀</th>
-                <th>원정팀</th>
-                <th>상태</th>
+              <th>순위</th>
+              <th>팀</th>
+              <th>경기</th>
+              <th>승</th>
+              <th>무</th>
+              <th>패</th>
+              <th>득점</th>
+              <th>실점</th>
+              <th>득실차</th>
+              <th>승점</th>
             </tr>
-        </thead>
+          </thead>
 
-        <tbody id="matchesTable"></tbody>
-    </table>
+          <tbody id="standingsTable"></tbody>
+        </table>
+      </div>
 
-    <p id="matchMessage" class="message"></p>
+      <p id="standingMessage" class="message"></p>
+    </section>
 
-    <p id="message" class="error"></p>
+    <section class="panel">
+      <h2 id="matchTitle">경기 일정</h2>
+
+      <div class="controls">
+        <label>
+          시작일
+          <input type="date" id="dateFrom" />
+        </label>
+
+        <label>
+          종료일
+          <input type="date" id="dateTo" />
+        </label>
+
+        <select id="matchStatus">
+          <option value="SCHEDULED">예정 경기</option>
+          <option value="FINISHED">종료 경기</option>
+          <option value="LIVE">진행 중</option>
+        </select>
+
+        <button onclick="loadMatches()">조회</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>라운드</th>
+              <th>홈팀</th>
+              <th>스코어</th>
+              <th>원정팀</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+
+          <tbody id="matchesTable"></tbody>
+        </table>
+      </div>
+
+      <p id="matchMessage" class="message"></p>
+    </section>
   </main>
 
   <script>
+    function setDefaultDates() {
+      const dateFromInput = document.getElementById("dateFrom");
+      const dateToInput = document.getElementById("dateTo");
+
+      const today = new Date();
+      const after30Days = new Date();
+      after30Days.setDate(today.getDate() + 30);
+
+      dateFromInput.value = today.toISOString().split("T")[0];
+      dateToInput.value = after30Days.toISOString().split("T")[0];
+    }
+
+    async function requestJson(url) {
+      const response = await fetch(url);
+      const text = await response.text();
+
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        throw new Error(
+          "API 응답이 JSON이 아닙니다. GitHub Pages 주소가 아니라 http://localhost:3000 으로 접속했는지 확인하세요."
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || "API 요청 실패");
+      }
+
+      return data;
+    }
+
+    function getCrestImage(src, name) {
+      if (!src) {
+        return "";
+      }
+
+      return `<img src="${src}" alt="${name}">`;
+    }
+
     async function loadStandings() {
       const competition = document.getElementById("competition").value;
       const tableBody = document.getElementById("standingsTable");
-      const message = document.getElementById("message");
+      const message = document.getElementById("standingMessage");
       const leagueTitle = document.getElementById("leagueTitle");
 
       tableBody.innerHTML = "";
-      message.textContent = "불러오는 중...";
+      message.textContent = "순위표를 불러오는 중...";
+      message.className = "message";
 
       try {
-        const response = await fetch(`/api/standings/${competition}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.detail || data.error || "데이터 요청 실패");
-        }
+        const data = await requestJson(`/api/standings/${competition}`);
 
         leagueTitle.textContent = `${data.competition} 순위표`;
-        message.textContent = "";
+        message.textContent = `총 ${data.table.length}개 팀을 불러왔습니다.`;
+        message.className = "message success-message";
 
         data.table.forEach(team => {
           const row = document.createElement("tr");
@@ -183,7 +343,7 @@
             <td class="rank">${team.position}</td>
             <td>
               <div class="team">
-                <img src="${team.crest}" alt="${team.teamName}">
+                ${getCrestImage(team.crest, team.teamName)}
                 ${team.teamName}
               </div>
             </td>
@@ -201,74 +361,93 @@
         });
       } catch (error) {
         message.textContent = error.message;
+        message.className = "message";
       }
     }
 
     async function loadMatches() {
-        const competition = document.getElementById("competition").value;
-        const matchesTable = document.getElementById("matchesTable");
-        const matchMessage = document.getElementById("matchMessage");
+      const competition = document.getElementById("competition").value;
+      const dateFrom = document.getElementById("dateFrom").value;
+      const dateTo = document.getElementById("dateTo").value;
+      const status = document.getElementById("matchStatus").value;
 
-        matchesTable.innerHTML = "";
-        matchMessage.textContent = "경기 일정을 불러오는 중...";
+      const matchesTable = document.getElementById("matchesTable");
+      const matchMessage = document.getElementById("matchMessage");
+      const matchTitle = document.getElementById("matchTitle");
 
-        try {
-            const response = await fetch(`/api/matches/${competition}`);
-            const data = await response.json();
+      matchesTable.innerHTML = "";
+      matchMessage.textContent = "경기 일정을 불러오는 중...";
+      matchMessage.className = "message";
 
-            if (!response.ok) {
-            throw new Error(data.detail || data.error || "경기 일정 요청 실패");
-            }
+      try {
+        const query = new URLSearchParams({
+          dateFrom,
+          dateTo,
+          status
+        });
 
-            matchMessage.textContent = "";
+        const data = await requestJson(`/api/matches/${competition}?${query.toString()}`);
 
-            if (data.matches.length === 0) {
-            matchMessage.textContent = "조회된 경기 일정이 없습니다.";
-            return;
-            }
+        matchTitle.textContent = `${data.competition} 경기 일정`;
 
-            data.matches.forEach(match => {
-            const date = new Date(match.utcDate);
-
-            const koreanTime = date.toLocaleString("ko-KR", {
-                timeZone: "Asia/Seoul",
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit"
-            });
-
-            const row = document.createElement("tr");
-
-            row.innerHTML = `
-                <td>${koreanTime}</td>
-                <td>${match.matchday || "-"}</td>
-                <td>
-                <div class="team">
-                    <img src="${match.homeCrest}" alt="${match.homeTeam}">
-                    ${match.homeTeam}
-                </div>
-                </td>
-                <td>
-                <div class="team">
-                    <img src="${match.awayCrest}" alt="${match.awayTeam}">
-                    ${match.awayTeam}
-                </div>
-                </td>
-                <td>${match.status}</td>
-            `;
-
-            matchesTable.appendChild(row);
-            });
-        } catch (error) {
-            matchMessage.textContent = error.message;
+        if (data.matches.length === 0) {
+          matchMessage.textContent = "조회된 경기 일정이 없습니다.";
+          matchMessage.className = "message";
+          return;
         }
+
+        matchMessage.textContent = `총 ${data.matches.length}개 경기를 불러왔습니다.`;
+        matchMessage.className = "message success-message";
+
+        data.matches.forEach(match => {
+          const date = new Date(match.utcDate);
+
+          const koreanTime = date.toLocaleString("ko-KR", {
+            timeZone: "Asia/Seoul",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+
+          const score =
+            match.homeScore === null || match.awayScore === null
+              ? "-"
+              : `${match.homeScore} : ${match.awayScore}`;
+
+          const row = document.createElement("tr");
+
+          row.innerHTML = `
+            <td>${koreanTime}</td>
+            <td>${match.matchday || "-"}</td>
+            <td>
+              <div class="team">
+                ${getCrestImage(match.homeCrest, match.homeTeam)}
+                ${match.homeTeam}
+              </div>
+            </td>
+            <td class="score">${score}</td>
+            <td>
+              <div class="team">
+                ${getCrestImage(match.awayCrest, match.awayTeam)}
+                ${match.awayTeam}
+              </div>
+            </td>
+            <td>${match.status}</td>
+          `;
+
+          matchesTable.appendChild(row);
+        });
+      } catch (error) {
+        matchMessage.textContent = error.message;
+        matchMessage.className = "message";
+      }
     }
 
+    setDefaultDates();
     loadStandings();
     loadMatches();
-
   </script>
 </body>
 </html>

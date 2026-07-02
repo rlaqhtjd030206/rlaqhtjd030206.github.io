@@ -16,33 +16,32 @@ function formatDate(date) {
   return date.toISOString().split("T")[0];
 }
 
-app.get("/api/matches/:competition", async (req, res) => {
+function checkCommonErrors(competition, res) {
+  if (!allowedCompetitions.includes(competition)) {
+    res.status(400).json({
+      error: "지원하지 않는 리그 코드입니다."
+    });
+    return true;
+  }
+
+  if (!API_KEY) {
+    res.status(500).json({
+      error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다."
+    });
+    return true;
+  }
+
+  return false;
+}
+
+// 순위표 API
+app.get("/api/standings/:competition", async (req, res) => {
   try {
     const competition = req.params.competition.toUpperCase();
 
-    if (!allowedCompetitions.includes(competition)) {
-      return res.status(400).json({
-        error: "지원하지 않는 리그 코드입니다."
-      });
-    }
+    if (checkCommonErrors(competition, res)) return;
 
-    if (!API_KEY) {
-      return res.status(500).json({
-        error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다."
-      });
-    }
-
-    const today = new Date();
-    const after30Days = new Date();
-    after30Days.setDate(today.getDate() + 30);
-
-    const dateFrom = req.query.dateFrom || formatDate(today);
-    const dateTo = req.query.dateTo || formatDate(after30Days);
-    const status = req.query.status || "SCHEDULED";
-
-    const url =
-      `https://api.football-data.org/v4/competitions/${competition}/matches` +
-      `?dateFrom=${dateFrom}&dateTo=${dateTo}&status=${status}`;
+    const url = `https://api.football-data.org/v4/competitions/${competition}/standings`;
 
     const response = await fetch(url, {
       headers: {
@@ -54,67 +53,7 @@ app.get("/api/matches/:competition", async (req, res) => {
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error: "경기 일정 API 요청 실패",
-        detail: data.message || data.error || data
-      });
-    }
-
-    const matches = data.matches.map(match => ({
-      id: match.id,
-      utcDate: match.utcDate,
-      status: match.status,
-      matchday: match.matchday,
-      homeTeam: match.homeTeam.name,
-      awayTeam: match.awayTeam.name,
-      homeCrest: match.homeTeam.crest,
-      awayCrest: match.awayTeam.crest,
-      homeScore: match.score.fullTime.home,
-      awayScore: match.score.fullTime.away
-    }));
-
-    res.json({
-      competition: data.competition.name,
-      count: data.resultSet.count,
-      matches
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: "서버 내부 오류",
-      detail: error.message
-    });
-  }
-});
-
-app.get("/api/standings/:competition", async (req, res) => {
-  try {
-    const competition = req.params.competition.toUpperCase();
-
-    if (!allowedCompetitions.includes(competition)) {
-      return res.status(400).json({
-        error: "지원하지 않는 리그 코드입니다."
-      });
-    }
-
-    if (!API_KEY) {
-      return res.status(500).json({
-        error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다."
-      });
-    }
-
-    const response = await fetch(
-      `https://api.football-data.org/v4/competitions/${competition}/standings`,
-      {
-        headers: {
-          "X-Auth-Token": API_KEY
-        }
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: "football-data API 요청 실패",
+        error: "football-data 순위표 API 요청 실패",
         detail: data.message || data.error || data
       });
     }
@@ -138,6 +77,67 @@ app.get("/api/standings/:competition", async (req, res) => {
     res.json({
       competition: data.competition.name,
       table
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "서버 내부 오류",
+      detail: error.message
+    });
+  }
+});
+
+// 경기 일정 API
+app.get("/api/matches/:competition", async (req, res) => {
+  try {
+    const competition = req.params.competition.toUpperCase();
+
+    if (checkCommonErrors(competition, res)) return;
+
+    const today = new Date();
+    const after30Days = new Date();
+    after30Days.setDate(today.getDate() + 30);
+
+    const dateFrom = req.query.dateFrom || formatDate(today);
+    const dateTo = req.query.dateTo || formatDate(after30Days);
+    const status = req.query.status || "SCHEDULED";
+
+    const url =
+      `https://api.football-data.org/v4/competitions/${competition}/matches` +
+      `?dateFrom=${dateFrom}&dateTo=${dateTo}&status=${status}`;
+
+    const response = await fetch(url, {
+      headers: {
+        "X-Auth-Token": API_KEY
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: "football-data 경기 일정 API 요청 실패",
+        detail: data.message || data.error || data
+      });
+    }
+
+    const matches = data.matches.map(match => ({
+      id: match.id,
+      utcDate: match.utcDate,
+      status: match.status,
+      matchday: match.matchday,
+      stage: match.stage,
+      homeTeam: match.homeTeam.name,
+      awayTeam: match.awayTeam.name,
+      homeCrest: match.homeTeam.crest,
+      awayCrest: match.awayTeam.crest,
+      homeScore: match.score?.fullTime?.home,
+      awayScore: match.score?.fullTime?.away
+    }));
+
+    res.json({
+      competition: data.competition.name,
+      count: data.resultSet.count,
+      matches
     });
   } catch (error) {
     res.status(500).json({
