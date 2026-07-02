@@ -101,15 +101,16 @@
 
   <main>
     <div class="controls">
-      <select id="competition">
-        <option value="PL">Premier League</option>
-        <option value="PD">La Liga</option>
-        <option value="BL1">Bundesliga</option>
-        <option value="SA">Serie A</option>
-        <option value="FL1">Ligue 1</option>
-      </select>
+        <select id="competition">
+            <option value="PL">Premier League</option>
+            <option value="PD">La Liga</option>
+            <option value="BL1">Bundesliga</option>
+            <option value="SA">Serie A</option>
+            <option value="FL1">Ligue 1</option>
+        </select>
 
-      <button onclick="loadStandings()">순위표 불러오기</button>
+        <button onclick="loadStandings()">순위표 불러오기</button>
+        <button onclick="loadMatches()">경기 일정 불러오기</button>
     </div>
 
     <h2 id="leagueTitle">리그 순위표</h2>
@@ -132,6 +133,24 @@
 
       <tbody id="standingsTable"></tbody>
     </table>
+
+    <h2 style="margin-top: 40px;">경기 일정</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>날짜</th>
+                <th>라운드</th>
+                <th>홈팀</th>
+                <th>원정팀</th>
+                <th>상태</th>
+            </tr>
+        </thead>
+
+        <tbody id="matchesTable"></tbody>
+    </table>
+
+    <p id="matchMessage" class="message"></p>
 
     <p id="message" class="error"></p>
   </main>
@@ -185,7 +204,71 @@
       }
     }
 
+    async function loadMatches() {
+        const competition = document.getElementById("competition").value;
+        const matchesTable = document.getElementById("matchesTable");
+        const matchMessage = document.getElementById("matchMessage");
+
+        matchesTable.innerHTML = "";
+        matchMessage.textContent = "경기 일정을 불러오는 중...";
+
+        try {
+            const response = await fetch(`/api/matches/${competition}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+            throw new Error(data.detail || data.error || "경기 일정 요청 실패");
+            }
+
+            matchMessage.textContent = "";
+
+            if (data.matches.length === 0) {
+            matchMessage.textContent = "조회된 경기 일정이 없습니다.";
+            return;
+            }
+
+            data.matches.forEach(match => {
+            const date = new Date(match.utcDate);
+
+            const koreanTime = date.toLocaleString("ko-KR", {
+                timeZone: "Asia/Seoul",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit"
+            });
+
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+                <td>${koreanTime}</td>
+                <td>${match.matchday || "-"}</td>
+                <td>
+                <div class="team">
+                    <img src="${match.homeCrest}" alt="${match.homeTeam}">
+                    ${match.homeTeam}
+                </div>
+                </td>
+                <td>
+                <div class="team">
+                    <img src="${match.awayCrest}" alt="${match.awayTeam}">
+                    ${match.awayTeam}
+                </div>
+                </td>
+                <td>${match.status}</td>
+            `;
+
+            matchesTable.appendChild(row);
+            });
+        } catch (error) {
+            matchMessage.textContent = error.message;
+        }
+    }
+
     loadStandings();
+    loadMatches();
+
   </script>
 </body>
 </html>
