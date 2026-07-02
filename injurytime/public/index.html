@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>축구 통계 사이트</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0f172a;
+      color: #e5e7eb;
+      font-family: Arial, sans-serif;
+    }
+
+    header {
+      background: #16a34a;
+      padding: 30px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+    }
+
+    select, button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: none;
+      font-size: 15px;
+    }
+
+    button {
+      background: #22c55e;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 12px;
+      text-align: center;
+      border-bottom: 1px solid #334155;
+    }
+
+    th {
+      background: #334155;
+    }
+
+    .team {
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: bold;
+    }
+
+    .team img {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+    }
+
+    .rank {
+      color: #22c55e;
+      font-weight: bold;
+    }
+
+    .error {
+      margin-top: 15px;
+      color: #f87171;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>축구 통계 사이트</h1>
+    <p>API 기반 리그 순위표</p>
+  </header>
+
+  <main>
+    <div class="controls">
+      <select id="competition">
+        <option value="PL">Premier League</option>
+        <option value="PD">La Liga</option>
+        <option value="BL1">Bundesliga</option>
+        <option value="SA">Serie A</option>
+        <option value="FL1">Ligue 1</option>
+      </select>
+
+      <button onclick="loadStandings()">순위표 불러오기</button>
+    </div>
+
+    <h2 id="leagueTitle">리그 순위표</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>순위</th>
+          <th>팀</th>
+          <th>경기</th>
+          <th>승</th>
+          <th>무</th>
+          <th>패</th>
+          <th>득점</th>
+          <th>실점</th>
+          <th>득실차</th>
+          <th>승점</th>
+        </tr>
+      </thead>
+
+      <tbody id="standingsTable"></tbody>
+    </table>
+
+    <p id="message" class="error"></p>
+  </main>
+
+  <script>
+    async function loadStandings() {
+      const competition = document.getElementById("competition").value;
+      const tableBody = document.getElementById("standingsTable");
+      const message = document.getElementById("message");
+      const leagueTitle = document.getElementById("leagueTitle");
+
+      tableBody.innerHTML = "";
+      message.textContent = "불러오는 중...";
+
+      try {
+        const response = await fetch(`/api/standings/${competition}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || data.error || "데이터 요청 실패");
+        }
+
+        leagueTitle.textContent = `${data.competition} 순위표`;
+        message.textContent = "";
+
+        data.table.forEach(team => {
+          const row = document.createElement("tr");
+
+          row.innerHTML = `
+            <td class="rank">${team.position}</td>
+            <td>
+              <div class="team">
+                <img src="${team.crest}" alt="${team.teamName}">
+                ${team.teamName}
+              </div>
+            </td>
+            <td>${team.played}</td>
+            <td>${team.won}</td>
+            <td>${team.draw}</td>
+            <td>${team.lost}</td>
+            <td>${team.goalsFor}</td>
+            <td>${team.goalsAgainst}</td>
+            <td>${team.goalDifference}</td>
+            <td><strong>${team.points}</strong></td>
+          `;
+
+          tableBody.appendChild(row);
+        });
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    loadStandings();
+  </script>
+</body>
+</html>
