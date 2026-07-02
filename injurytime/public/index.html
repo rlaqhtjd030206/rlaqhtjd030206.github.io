@@ -35,7 +35,7 @@
     }
 
     main {
-      max-width: 1200px;
+      max-width: 1250px;
       margin: 30px auto;
       padding: 0 20px;
     }
@@ -82,9 +82,21 @@
       background: #16a34a;
     }
 
+    .secondary-btn {
+      background: #2563eb;
+    }
+
+    .secondary-btn:hover {
+      background: #1d4ed8;
+    }
+
     h2 {
       margin: 0 0 16px;
       font-size: 24px;
+    }
+
+    h3 {
+      margin: 22px 0 12px;
     }
 
     .table-wrap {
@@ -156,6 +168,59 @@
       margin-top: 8px;
     }
 
+    .detail-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 18px;
+      margin-top: 15px;
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .detail-header img {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 6px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .info-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .info-box span {
+      display: block;
+      color: #94a3b8;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+
+    .info-box strong {
+      color: #e5e7eb;
+    }
+
+    a {
+      color: #93c5fd;
+    }
+
     @media (max-width: 768px) {
       header h1 {
         font-size: 26px;
@@ -175,14 +240,18 @@
       input {
         width: 100%;
       }
+
+      .detail-header {
+        align-items: flex-start;
+      }
     }
   </style>
 </head>
 
 <body>
   <header>
-    <h1>축구 통계 사이트</h1>
-    <p>API 기반 리그 순위표 · 경기 일정</p>
+    <h1>INJURY TIME</h1>
+    <p>리그 순위표 · 경기 일정 · 팀 세부 정보 · 선수 스탯</p>
   </header>
 
   <main>
@@ -196,14 +265,12 @@
           <option value="FL1">Ligue 1</option>
         </select>
 
-        <button onclick="loadStandings()">순위표 불러오기</button>
-        <button onclick="loadMatches()">경기 일정 불러오기</button>
+        <button onclick="loadAll()">전체 새로고침</button>
+        <button onclick="loadStandings()">순위표</button>
+        <button onclick="loadMatches()">경기 일정</button>
+        <button onclick="loadTeams()">팀 목록</button>
+        <button onclick="loadScorers()">득점 순위</button>
       </div>
-
-      <p class="small">
-        반드시 <strong>http://localhost:3000</strong> 주소에서 실행해야 API가 작동합니다.
-        GitHub Pages 주소에서는 server.js가 실행되지 않습니다.
-      </p>
     </section>
 
     <section class="panel">
@@ -223,6 +290,8 @@
               <th>실점</th>
               <th>득실차</th>
               <th>승점</th>
+              <th>최근폼</th>
+              <th>상세</th>
             </tr>
           </thead>
 
@@ -275,6 +344,68 @@
 
       <p id="matchMessage" class="message"></p>
     </section>
+
+    <section class="panel">
+      <h2 id="teamsTitle">팀 목록</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>팀</th>
+              <th>약자</th>
+              <th>창단</th>
+              <th>홈구장</th>
+              <th>스쿼드 수</th>
+              <th>상세</th>
+            </tr>
+          </thead>
+
+          <tbody id="teamsTable"></tbody>
+        </table>
+      </div>
+
+      <p id="teamsMessage" class="message"></p>
+
+      <div id="teamDetail"></div>
+    </section>
+
+    <section class="panel">
+      <h2 id="scorersTitle">선수 득점 순위</h2>
+
+      <div class="controls">
+        <label>
+          표시 인원
+          <input type="number" id="scorerLimit" value="20" min="1" max="100" />
+        </label>
+
+        <button onclick="loadScorers()">득점 순위 조회</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>선수</th>
+              <th>팀</th>
+              <th>포지션</th>
+              <th>국적</th>
+              <th>골</th>
+              <th>도움</th>
+              <th>PK</th>
+              <th>상세</th>
+            </tr>
+          </thead>
+
+          <tbody id="scorersTable"></tbody>
+        </table>
+      </div>
+
+      <p id="scorersMessage" class="message"></p>
+
+      <div id="playerDetail"></div>
+    </section>
   </main>
 
   <script>
@@ -300,7 +431,7 @@
         data = JSON.parse(text);
       } catch (error) {
         throw new Error(
-          "API 응답이 JSON이 아닙니다. GitHub Pages 주소가 아니라 http://localhost:3000 으로 접속했는지 확인하세요."
+          "API 응답이 JSON이 아닙니다. http://localhost:3000 주소로 접속했는지 확인하세요."
         );
       }
 
@@ -317,6 +448,37 @@
       }
 
       return `<img src="${src}" alt="${name}">`;
+    }
+
+    function formatKoreanTime(utcDate) {
+      if (!utcDate) {
+        return "-";
+      }
+
+      return new Date(utcDate).toLocaleString("ko-KR", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+
+    function formatDateOnly(dateText) {
+      if (!dateText) {
+        return "-";
+      }
+
+      return String(dateText).split("T")[0];
+    }
+
+    function formatScore(match) {
+      if (match.homeScore === null || match.homeScore === undefined || match.awayScore === null || match.awayScore === undefined) {
+        return "-";
+      }
+
+      return `${match.homeScore} : ${match.awayScore}`;
     }
 
     async function loadStandings() {
@@ -355,6 +517,10 @@
             <td>${team.goalsAgainst}</td>
             <td>${team.goalDifference}</td>
             <td><strong>${team.points}</strong></td>
+            <td>${team.form || "-"}</td>
+            <td>
+              <button class="secondary-btn" onclick="loadTeamDetail(${team.teamId})">보기</button>
+            </td>
           `;
 
           tableBody.appendChild(row);
@@ -400,26 +566,10 @@
         matchMessage.className = "message success-message";
 
         data.matches.forEach(match => {
-          const date = new Date(match.utcDate);
-
-          const koreanTime = date.toLocaleString("ko-KR", {
-            timeZone: "Asia/Seoul",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit"
-          });
-
-          const score =
-            match.homeScore === null || match.awayScore === null
-              ? "-"
-              : `${match.homeScore} : ${match.awayScore}`;
-
           const row = document.createElement("tr");
 
           row.innerHTML = `
-            <td>${koreanTime}</td>
+            <td>${formatKoreanTime(match.utcDate)}</td>
             <td>${match.matchday || "-"}</td>
             <td>
               <div class="team">
@@ -427,7 +577,7 @@
                 ${match.homeTeam}
               </div>
             </td>
-            <td class="score">${score}</td>
+            <td class="score">${formatScore(match)}</td>
             <td>
               <div class="team">
                 ${getCrestImage(match.awayCrest, match.awayTeam)}
@@ -445,9 +595,313 @@
       }
     }
 
+    async function loadTeams() {
+      const competition = document.getElementById("competition").value;
+      const teamsTable = document.getElementById("teamsTable");
+      const teamsMessage = document.getElementById("teamsMessage");
+      const teamsTitle = document.getElementById("teamsTitle");
+
+      teamsTable.innerHTML = "";
+      teamsMessage.textContent = "팀 목록을 불러오는 중...";
+      teamsMessage.className = "message";
+
+      try {
+        const data = await requestJson(`/api/teams/${competition}`);
+
+        teamsTitle.textContent = `${data.competition} 팀 목록`;
+        teamsMessage.textContent = `총 ${data.teams.length}개 팀을 불러왔습니다.`;
+        teamsMessage.className = "message success-message";
+
+        data.teams.forEach(team => {
+          const row = document.createElement("tr");
+
+          row.innerHTML = `
+            <td>
+              <div class="team">
+                ${getCrestImage(team.crest, team.name)}
+                ${team.name}
+              </div>
+            </td>
+            <td>${team.tla || "-"}</td>
+            <td>${team.founded || "-"}</td>
+            <td>${team.venue || "-"}</td>
+            <td>${team.squadCount}</td>
+            <td>
+              <button class="secondary-btn" onclick="loadTeamDetail(${team.id})">보기</button>
+            </td>
+          `;
+
+          teamsTable.appendChild(row);
+        });
+      } catch (error) {
+        teamsMessage.textContent = error.message;
+        teamsMessage.className = "message";
+      }
+    }
+
+    async function loadTeamDetail(teamId) {
+      const teamDetail = document.getElementById("teamDetail");
+
+      teamDetail.innerHTML = `
+        <div class="detail-card">
+          팀 세부 정보를 불러오는 중...
+        </div>
+      `;
+
+      try {
+        const team = await requestJson(`/api/team/${teamId}`);
+        const scheduledMatches = await requestJson(`/api/team/${teamId}/matches?status=SCHEDULED&limit=5`);
+
+        const squadRows = team.squad.map(player => `
+          <tr>
+            <td>${player.name}</td>
+            <td>${player.position || "-"}</td>
+            <td>${formatDateOnly(player.dateOfBirth)}</td>
+            <td>${player.nationality || "-"}</td>
+            <td>${player.role || "-"}</td>
+            <td>
+              <button class="secondary-btn" onclick="loadPlayerDetail(${player.id})">선수 보기</button>
+            </td>
+          </tr>
+        `).join("");
+
+        const matchRows = scheduledMatches.matches.map(match => `
+          <tr>
+            <td>${formatKoreanTime(match.utcDate)}</td>
+            <td>${match.competition || "-"}</td>
+            <td>${match.homeTeam}</td>
+            <td class="score">${formatScore(match)}</td>
+            <td>${match.awayTeam}</td>
+            <td>${match.status}</td>
+          </tr>
+        `).join("");
+
+        teamDetail.innerHTML = `
+          <div class="detail-card">
+            <div class="detail-header">
+              ${getCrestImage(team.crest, team.name)}
+              <div>
+                <h2>${team.name}</h2>
+                <p class="small">${team.shortName || "-"} · ${team.tla || "-"}</p>
+              </div>
+            </div>
+
+            <div class="info-grid">
+              <div class="info-box">
+                <span>창단</span>
+                <strong>${team.founded || "-"}</strong>
+              </div>
+
+              <div class="info-box">
+                <span>홈구장</span>
+                <strong>${team.venue || "-"}</strong>
+              </div>
+
+              <div class="info-box">
+                <span>팀 컬러</span>
+                <strong>${team.clubColors || "-"}</strong>
+              </div>
+
+              <div class="info-box">
+                <span>웹사이트</span>
+                <strong>${team.website ? `<a href="${team.website}" target="_blank">바로가기</a>` : "-"}</strong>
+              </div>
+            </div>
+
+            <h3>예정 경기 5개</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>날짜</th>
+                    <th>대회</th>
+                    <th>홈팀</th>
+                    <th>스코어</th>
+                    <th>원정팀</th>
+                    <th>상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${matchRows || `<tr><td colspan="6">예정 경기가 없습니다.</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+
+            <h3>스쿼드</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>선수</th>
+                    <th>포지션</th>
+                    <th>생년월일</th>
+                    <th>국적</th>
+                    <th>역할</th>
+                    <th>상세</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${squadRows || `<tr><td colspan="6">스쿼드 정보가 없습니다.</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+
+        teamDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (error) {
+        teamDetail.innerHTML = `
+          <div class="detail-card message">
+            ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    async function loadScorers() {
+      const competition = document.getElementById("competition").value;
+      const limit = document.getElementById("scorerLimit").value || 20;
+
+      const scorersTable = document.getElementById("scorersTable");
+      const scorersMessage = document.getElementById("scorersMessage");
+      const scorersTitle = document.getElementById("scorersTitle");
+
+      scorersTable.innerHTML = "";
+      scorersMessage.textContent = "득점 순위를 불러오는 중...";
+      scorersMessage.className = "message";
+
+      try {
+        const data = await requestJson(`/api/scorers/${competition}?limit=${limit}`);
+
+        scorersTitle.textContent = `${data.competition} 선수 득점 순위`;
+        scorersMessage.textContent = `총 ${data.scorers.length}명의 선수를 불러왔습니다.`;
+        scorersMessage.className = "message success-message";
+
+        data.scorers.forEach((item, index) => {
+          const row = document.createElement("tr");
+
+          row.innerHTML = `
+            <td class="rank">${index + 1}</td>
+            <td>${item.playerName}</td>
+            <td>
+              <div class="team">
+                ${getCrestImage(item.teamCrest, item.teamName)}
+                ${item.teamName}
+              </div>
+            </td>
+            <td>${item.position || "-"}</td>
+            <td>${item.nationality || "-"}</td>
+            <td><strong>${item.goals ?? "-"}</strong></td>
+            <td>${item.assists ?? "-"}</td>
+            <td>${item.penalties ?? "-"}</td>
+            <td>
+              <button class="secondary-btn" onclick="loadPlayerDetail(${item.playerId})">보기</button>
+            </td>
+          `;
+
+          scorersTable.appendChild(row);
+        });
+      } catch (error) {
+        scorersMessage.textContent = error.message;
+        scorersMessage.className = "message";
+      }
+    }
+
+    async function loadPlayerDetail(playerId) {
+      const playerDetail = document.getElementById("playerDetail");
+
+      playerDetail.innerHTML = `
+        <div class="detail-card">
+          선수 세부 정보를 불러오는 중...
+        </div>
+      `;
+
+      try {
+        const player = await requestJson(`/api/player/${playerId}`);
+        const matches = await requestJson(`/api/player/${playerId}/matches?status=FINISHED&limit=5`);
+
+        const matchRows = matches.matches.map(match => `
+          <tr>
+            <td>${formatKoreanTime(match.utcDate)}</td>
+            <td>${match.competition || "-"}</td>
+            <td>${match.homeTeam}</td>
+            <td class="score">${formatScore(match)}</td>
+            <td>${match.awayTeam}</td>
+            <td>${match.status}</td>
+          </tr>
+        `).join("");
+
+        playerDetail.innerHTML = `
+          <div class="detail-card">
+            <h2>${player.name}</h2>
+
+            <div class="info-grid">
+              <div class="info-box">
+                <span>포지션</span>
+                <strong>${player.position || "-"}</strong>
+              </div>
+
+              <div class="info-box">
+                <span>생년월일</span>
+                <strong>${formatDateOnly(player.dateOfBirth)}</strong>
+              </div>
+
+              <div class="info-box">
+                <span>출생국</span>
+                <strong>${player.countryOfBirth || "-"}</strong>
+              </div>
+
+              <div class="info-box">
+                <span>국적</span>
+                <strong>${player.nationality || "-"}</strong>
+              </div>
+
+              <div class="info-box">
+                <span>등번호</span>
+                <strong>${player.shirtNumber || "-"}</strong>
+              </div>
+            </div>
+
+            <h3>최근 종료 경기 5개</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>날짜</th>
+                    <th>대회</th>
+                    <th>홈팀</th>
+                    <th>스코어</th>
+                    <th>원정팀</th>
+                    <th>상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${matchRows || `<tr><td colspan="6">조회된 경기 정보가 없습니다.</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+
+        playerDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (error) {
+        playerDetail.innerHTML = `
+          <div class="detail-card message">
+            ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    async function loadAll() {
+      await loadStandings();
+      await loadMatches();
+      await loadTeams();
+      await loadScorers();
+    }
+
     setDefaultDates();
-    loadStandings();
-    loadMatches();
+    loadAll();
   </script>
 </body>
 </html>
