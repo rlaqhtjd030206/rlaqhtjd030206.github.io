@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>INJURY TIME</title>
+  <title>축구 통계 사이트</title>
 
   <style>
     * {
@@ -88,6 +88,14 @@
 
     .secondary-btn:hover {
       background: #1d4ed8;
+    }
+
+    .danger-btn {
+      background: #dc2626;
+    }
+
+    .danger-btn:hover {
+      background: #b91c1c;
     }
 
     h2 {
@@ -221,6 +229,37 @@
       color: #93c5fd;
     }
 
+    .auth-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .auth-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .auth-box h3 {
+      margin-top: 0;
+    }
+
+    .auth-box input {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .user-status {
+      margin-top: 15px;
+      padding: 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      line-height: 1.6;
+    }
+
     @media (max-width: 768px) {
       header h1 {
         font-size: 26px;
@@ -250,11 +289,46 @@
 
 <body>
   <header>
-    <h1>INJURY TIME</h1>
-    <p>리그 순위표 · 경기 일정 · 팀 세부 정보 · 선수 스탯</p>
+    <h1>축구 통계 사이트</h1>
+    <p>로그인 · 리그 순위표 · 경기 일정 · 팀 세부 정보 · 선수 스탯</p>
   </header>
 
   <main>
+    <section class="panel">
+      <h2>로그인 / 회원가입</h2>
+
+      <div class="auth-grid">
+        <div class="auth-box">
+          <h3>회원가입</h3>
+
+          <input type="text" id="signupNickname" placeholder="닉네임" />
+          <input type="number" id="signupAge" placeholder="나이" />
+          <input type="email" id="signupEmail" placeholder="이메일" />
+          <input type="password" id="signupPassword" placeholder="비밀번호 8자 이상" />
+
+          <button onclick="signup()">회원가입</button>
+
+          <p id="signupMessage" class="message"></p>
+        </div>
+
+        <div class="auth-box">
+          <h3>로그인</h3>
+
+          <input type="email" id="loginEmail" placeholder="이메일" />
+          <input type="password" id="loginPassword" placeholder="비밀번호" />
+
+          <button onclick="login()">로그인</button>
+          <button class="danger-btn" onclick="logout()">로그아웃</button>
+
+          <div id="userStatus" class="user-status">
+            로그인하지 않았습니다.
+          </div>
+
+          <p id="loginMessage" class="message"></p>
+        </div>
+      </div>
+    </section>
+
     <section class="panel">
       <div class="controls">
         <select id="competition">
@@ -271,6 +345,11 @@
         <button onclick="loadTeams()">팀 목록</button>
         <button onclick="loadScorers()">득점 순위</button>
       </div>
+
+      <p class="small">
+        실행 주소는 <strong>http://localhost:3000</strong> 이어야 합니다.
+        GitHub Pages 주소에서는 Node.js API 서버가 실행되지 않습니다.
+      </p>
     </section>
 
     <section class="panel">
@@ -409,6 +488,8 @@
   </main>
 
   <script>
+    let currentUser = null;
+
     function setDefaultDates() {
       const dateFromInput = document.getElementById("dateFrom");
       const dateToInput = document.getElementById("dateTo");
@@ -421,8 +502,12 @@
       dateToInput.value = after30Days.toISOString().split("T")[0];
     }
 
-    async function requestJson(url) {
-      const response = await fetch(url);
+    async function requestJson(url, options = {}) {
+      const response = await fetch(url, {
+        credentials: "include",
+        ...options
+      });
+
       const text = await response.text();
 
       let data;
@@ -436,10 +521,132 @@
       }
 
       if (!response.ok) {
-        throw new Error(data.detail || data.error || "API 요청 실패");
+        throw new Error(data.error || data.detail || "API 요청 실패");
       }
 
       return data;
+    }
+
+    function updateUserStatus() {
+      const userStatus = document.getElementById("userStatus");
+
+      if (!currentUser) {
+        userStatus.innerHTML = "로그인하지 않았습니다.";
+        return;
+      }
+
+      userStatus.innerHTML = `
+        <strong>${currentUser.nickname}</strong>님 로그인 중<br>
+        나이: ${currentUser.age}<br>
+        이메일: ${currentUser.email}
+      `;
+    }
+
+    async function checkLoginStatus() {
+      try {
+        const data = await requestJson("/api/me");
+        currentUser = data.user;
+      } catch (error) {
+        currentUser = null;
+      }
+
+      updateUserStatus();
+    }
+
+    async function signup() {
+      const nickname = document.getElementById("signupNickname").value;
+      const age = document.getElementById("signupAge").value;
+      const email = document.getElementById("signupEmail").value;
+      const password = document.getElementById("signupPassword").value;
+      const signupMessage = document.getElementById("signupMessage");
+
+      signupMessage.textContent = "회원가입 처리 중...";
+      signupMessage.className = "message";
+
+      try {
+        const data = await requestJson("/api/signup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            nickname,
+            age,
+            email,
+            password
+          })
+        });
+
+        currentUser = data.user;
+
+        signupMessage.textContent = "회원가입이 완료되었습니다.";
+        signupMessage.className = "message success-message";
+
+        document.getElementById("signupNickname").value = "";
+        document.getElementById("signupAge").value = "";
+        document.getElementById("signupEmail").value = "";
+        document.getElementById("signupPassword").value = "";
+
+        updateUserStatus();
+      } catch (error) {
+        signupMessage.textContent = error.message;
+        signupMessage.className = "message";
+      }
+    }
+
+    async function login() {
+      const email = document.getElementById("loginEmail").value;
+      const password = document.getElementById("loginPassword").value;
+      const loginMessage = document.getElementById("loginMessage");
+
+      loginMessage.textContent = "로그인 처리 중...";
+      loginMessage.className = "message";
+
+      try {
+        const data = await requestJson("/api/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email,
+            password
+          })
+        });
+
+        currentUser = data.user;
+
+        loginMessage.textContent = "로그인 성공";
+        loginMessage.className = "message success-message";
+
+        document.getElementById("loginEmail").value = "";
+        document.getElementById("loginPassword").value = "";
+
+        updateUserStatus();
+      } catch (error) {
+        loginMessage.textContent = error.message;
+        loginMessage.className = "message";
+      }
+    }
+
+    async function logout() {
+      const loginMessage = document.getElementById("loginMessage");
+
+      try {
+        await requestJson("/api/logout", {
+          method: "POST"
+        });
+
+        currentUser = null;
+
+        loginMessage.textContent = "로그아웃되었습니다.";
+        loginMessage.className = "message success-message";
+
+        updateUserStatus();
+      } catch (error) {
+        loginMessage.textContent = error.message;
+        loginMessage.className = "message";
+      }
     }
 
     function getCrestImage(src, name) {
@@ -474,7 +681,12 @@
     }
 
     function formatScore(match) {
-      if (match.homeScore === null || match.homeScore === undefined || match.awayScore === null || match.awayScore === undefined) {
+      if (
+        match.homeScore === null ||
+        match.homeScore === undefined ||
+        match.awayScore === null ||
+        match.awayScore === undefined
+      ) {
         return "-";
       }
 
@@ -901,6 +1113,7 @@
     }
 
     setDefaultDates();
+    checkLoginStatus();
     loadAll();
   </script>
 </body>
