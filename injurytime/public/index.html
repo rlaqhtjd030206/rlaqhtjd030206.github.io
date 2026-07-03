@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>축구 통계 사이트</title>
+  <title>INJURY TIME</title>
 
   <style>
     * {
@@ -18,20 +18,16 @@
       font-family: Arial, sans-serif;
     }
 
-    header {
+    .site-header {
       background: #16a34a;
-      padding: 32px 20px;
+      padding: 36px 20px;
       text-align: center;
     }
 
-    header h1 {
-      margin: 0 0 10px;
-      font-size: 34px;
-    }
-
-    header p {
+    .site-header h1 {
       margin: 0;
-      color: #dcfce7;
+      font-size: 42px;
+      letter-spacing: 2px;
     }
 
     main {
@@ -40,12 +36,61 @@
       padding: 0 20px;
     }
 
+    .hidden {
+      display: none !important;
+    }
+
     .panel {
       background: #111827;
       border: 1px solid #1f2937;
       border-radius: 16px;
       padding: 20px;
       margin-bottom: 30px;
+    }
+
+    .auth-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .auth-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .auth-box,
+    .detail-card,
+    .follow-card,
+    .hot-card,
+    .comment,
+    .match-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .auth-box input {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .app-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .user-status {
+      padding: 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      line-height: 1.6;
+      margin-bottom: 10px;
     }
 
     .controls {
@@ -58,7 +103,8 @@
 
     select,
     button,
-    input {
+    input,
+    textarea {
       padding: 10px 14px;
       border-radius: 8px;
       border: none;
@@ -66,9 +112,16 @@
     }
 
     select,
-    input {
+    input,
+    textarea {
       background: #f8fafc;
       color: #0f172a;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      resize: vertical;
     }
 
     button {
@@ -96,6 +149,14 @@
 
     .danger-btn:hover {
       background: #b91c1c;
+    }
+
+    .muted-btn {
+      background: #475569;
+    }
+
+    .muted-btn:hover {
+      background: #334155;
     }
 
     h2 {
@@ -145,7 +206,8 @@
       font-weight: bold;
     }
 
-    .team img {
+    .team img,
+    .mini-img {
       width: 24px;
       height: 24px;
       object-fit: contain;
@@ -177,10 +239,6 @@
     }
 
     .detail-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 14px;
-      padding: 18px;
       margin-top: 15px;
     }
 
@@ -225,51 +283,89 @@
       color: #e5e7eb;
     }
 
+    .follow-grid,
+    .match-card-grid,
+    .hot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .follow-card {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .follow-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .follow-main img {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .follow-main strong {
+      display: block;
+    }
+
+    .follow-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .match-card-title {
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .comment {
+      margin-bottom: 10px;
+    }
+
+    .reply {
+      margin-left: 28px;
+      background: #0f172a;
+    }
+
+    .comment-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .reply-box {
+      margin-top: 10px;
+    }
+
     a {
       color: #93c5fd;
     }
 
-    .auth-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
-    }
-
-    .auth-box {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 14px;
-      padding: 18px;
-    }
-
-    .auth-box h3 {
-      margin-top: 0;
-    }
-
-    .auth-box input {
-      width: 100%;
-      margin-bottom: 10px;
-    }
-
-    .user-status {
-      margin-top: 15px;
-      padding: 12px;
-      background: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 10px;
-      line-height: 1.6;
-    }
-
     @media (max-width: 768px) {
-      header h1 {
-        font-size: 26px;
+      .site-header h1 {
+        font-size: 32px;
       }
 
       main {
         padding: 0 12px;
       }
 
-      .controls {
+      .controls,
+      .app-top {
         flex-direction: column;
         align-items: stretch;
       }
@@ -283,223 +379,326 @@
       .detail-header {
         align-items: flex-start;
       }
+
+      .follow-card {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .follow-actions {
+        justify-content: stretch;
+      }
+
+      .reply {
+        margin-left: 10px;
+      }
     }
   </style>
 </head>
 
 <body>
-  <header>
-    <h1>축구 통계 사이트</h1>
-    <p>로그인 · 리그 순위표 · 경기 일정 · 팀 세부 정보 · 선수 스탯</p>
+  <header class="site-header">
+    <h1>INJURY TIME</h1>
   </header>
 
   <main>
-    <section class="panel">
-      <h2>로그인 / 회원가입</h2>
+    <section id="authView" class="auth-container">
+      <div class="panel">
+        <div class="auth-grid">
+          <div class="auth-box">
+            <h2>회원가입</h2>
 
-      <div class="auth-grid">
-        <div class="auth-box">
-          <h3>회원가입</h3>
+            <input type="text" id="signupNickname" placeholder="닉네임" />
+            <input type="number" id="signupAge" placeholder="나이" />
+            <input type="email" id="signupEmail" placeholder="이메일" />
+            <input type="password" id="signupPassword" placeholder="비밀번호 8자 이상" />
 
-          <input type="text" id="signupNickname" placeholder="닉네임" />
-          <input type="number" id="signupAge" placeholder="나이" />
-          <input type="email" id="signupEmail" placeholder="이메일" />
-          <input type="password" id="signupPassword" placeholder="비밀번호 8자 이상" />
+            <button onclick="signup()">회원가입</button>
 
-          <button onclick="signup()">회원가입</button>
-
-          <p id="signupMessage" class="message"></p>
-        </div>
-
-        <div class="auth-box">
-          <h3>로그인</h3>
-
-          <input type="email" id="loginEmail" placeholder="이메일" />
-          <input type="password" id="loginPassword" placeholder="비밀번호" />
-
-          <button onclick="login()">로그인</button>
-          <button class="danger-btn" onclick="logout()">로그아웃</button>
-
-          <div id="userStatus" class="user-status">
-            로그인하지 않았습니다.
+            <p id="signupMessage" class="message"></p>
           </div>
 
-          <p id="loginMessage" class="message"></p>
+          <div class="auth-box">
+            <h2>로그인</h2>
+
+            <input type="email" id="loginEmail" placeholder="이메일" />
+            <input type="password" id="loginPassword" placeholder="비밀번호" />
+
+            <button onclick="login()">로그인</button>
+
+            <p id="loginMessage" class="message"></p>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="panel">
-      <div class="controls">
-        <select id="competition">
-          <option value="PL">Premier League</option>
-          <option value="PD">La Liga</option>
-          <option value="BL1">Bundesliga</option>
-          <option value="SA">Serie A</option>
-          <option value="FL1">Ligue 1</option>
-        </select>
+    <section id="appView" class="hidden">
+      <section class="panel">
+        <div class="app-top">
+          <div>
+            <h2>대시보드</h2>
+            <p class="small">통계, 일정, HOT, 프로필, 경기 예측, 댓글, 좋아요를 관리합니다.</p>
+          </div>
 
-        <button onclick="loadAll()">전체 새로고침</button>
-        <button onclick="loadStandings()">순위표</button>
-        <button onclick="loadMatches()">경기 일정</button>
-        <button onclick="loadTeams()">팀 목록</button>
-        <button onclick="loadScorers()">득점 순위</button>
-      </div>
+          <div>
+            <div id="userStatus" class="user-status">로그인 상태 확인 중...</div>
+            <button class="danger-btn" onclick="logout()">로그아웃</button>
+          </div>
+        </div>
+      </section>
 
-      <p class="small">
-        실행 주소는 <strong>http://localhost:3000</strong> 이어야 합니다.
-        GitHub Pages 주소에서는 Node.js API 서버가 실행되지 않습니다.
-      </p>
-    </section>
+      <section class="panel">
+        <h2>HOT 좋아요 TOP 5</h2>
 
-    <section class="panel">
-      <h2 id="leagueTitle">리그 순위표</h2>
+        <h3>팀</h3>
+        <div id="hotTeams" class="hot-grid"></div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>순위</th>
-              <th>팀</th>
-              <th>경기</th>
-              <th>승</th>
-              <th>무</th>
-              <th>패</th>
-              <th>득점</th>
-              <th>실점</th>
-              <th>득실차</th>
-              <th>승점</th>
-              <th>최근폼</th>
-              <th>상세</th>
-            </tr>
-          </thead>
+        <h3>선수</h3>
+        <div id="hotPlayers" class="hot-grid"></div>
 
-          <tbody id="standingsTable"></tbody>
-        </table>
-      </div>
+        <h3>경기</h3>
+        <div id="hotMatches" class="hot-grid"></div>
 
-      <p id="standingMessage" class="message"></p>
-    </section>
+        <p id="hotMessage" class="message"></p>
+      </section>
 
-    <section class="panel">
-      <h2 id="matchTitle">경기 일정</h2>
+      <section class="panel">
+        <div class="controls">
+          <select id="competition">
+            <option value="PL">Premier League</option>
+            <option value="PD">La Liga</option>
+            <option value="BL1">Bundesliga</option>
+            <option value="SA">Serie A</option>
+            <option value="FL1">Ligue 1</option>
+          </select>
 
-      <div class="controls">
-        <label>
-          시작일
-          <input type="date" id="dateFrom" />
-        </label>
+          <button onclick="loadAll()">전체 새로고침</button>
+          <button onclick="loadStandings()">순위표</button>
+          <button onclick="loadMatches()">일정</button>
+          <button onclick="loadProfile()">프로필</button>
+          <button onclick="loadScorers()">선수 득점 순위</button>
+        </div>
+      </section>
 
-        <label>
-          종료일
-          <input type="date" id="dateTo" />
-        </label>
+      <section class="panel">
+        <h2>프로필</h2>
 
-        <select id="matchStatus">
-          <option value="SCHEDULED">예정 경기</option>
-          <option value="FINISHED">종료 경기</option>
-          <option value="LIVE">진행 중</option>
-        </select>
+        <div id="profileInfo" class="info-grid"></div>
 
-        <button onclick="loadMatches()">조회</button>
-      </div>
+        <h3>팔로우한 팀</h3>
+        <div id="followedTeams" class="follow-grid"></div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>날짜</th>
-              <th>라운드</th>
-              <th>홈팀</th>
-              <th>스코어</th>
-              <th>원정팀</th>
-              <th>상태</th>
-            </tr>
-          </thead>
+        <h3>팔로우한 선수</h3>
+        <div id="followedPlayers" class="follow-grid"></div>
 
-          <tbody id="matchesTable"></tbody>
-        </table>
-      </div>
+        <h3>팔로우한 팀의 예정 경기</h3>
+        <div id="followedTeamMatches" class="match-card-grid"></div>
 
-      <p id="matchMessage" class="message"></p>
-    </section>
+        <p id="profileMessage" class="message"></p>
+      </section>
 
-    <section class="panel">
-      <h2 id="teamsTitle">팀 목록</h2>
+      <section class="panel hidden" id="matchRoomPanel">
+        <h2 id="matchRoomTitle">경기 창</h2>
+        <div id="matchRoomMeta" class="small"></div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>팀</th>
-              <th>약자</th>
-              <th>창단</th>
-              <th>홈구장</th>
-              <th>스쿼드 수</th>
-              <th>상세</th>
-            </tr>
-          </thead>
+        <div class="controls">
+          <button id="matchLikeButton" onclick="likeMatchRoom()">이번 주 좋아요</button>
+        </div>
 
-          <tbody id="teamsTable"></tbody>
-        </table>
-      </div>
+        <div class="info-grid" id="predictionStats"></div>
 
-      <p id="teamsMessage" class="message"></p>
+        <h3>내 예측</h3>
+        <div class="controls">
+          <select id="predictionResult" onchange="normalizePredictionScore()">
+            <option value="home">홈 승</option>
+            <option value="draw">무승부</option>
+            <option value="away">원정 승</option>
+          </select>
 
-      <div id="teamDetail"></div>
-    </section>
+          <input type="number" id="predHomeScore" min="0" max="30" value="1" onchange="normalizePredictionScore()" placeholder="홈 스코어" />
+          <input type="number" id="predAwayScore" min="0" max="30" value="0" onchange="normalizePredictionScore()" placeholder="원정 스코어" />
 
-    <section class="panel">
-      <h2 id="scorersTitle">선수 득점 순위</h2>
+          <button onclick="savePrediction()">예측 저장</button>
+        </div>
 
-      <div class="controls">
-        <label>
-          표시 인원
-          <input type="number" id="scorerLimit" value="20" min="1" max="100" />
-        </label>
+        <p id="predictionMessage" class="message"></p>
 
-        <button onclick="loadScorers()">득점 순위 조회</button>
-      </div>
+        <h3>댓글</h3>
+        <textarea id="matchCommentBody" placeholder="댓글을 입력하세요. 최대 500자"></textarea>
+        <button onclick="saveComment('match', currentMatch.itemId, currentMatch.itemName, currentMatch.itemMeta, null, 'matchCommentBody')">댓글 등록</button>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>순위</th>
-              <th>선수</th>
-              <th>팀</th>
-              <th>포지션</th>
-              <th>국적</th>
-              <th>골</th>
-              <th>도움</th>
-              <th>PK</th>
-              <th>상세</th>
-            </tr>
-          </thead>
+        <div id="matchCommentsList"></div>
+      </section>
 
-          <tbody id="scorersTable"></tbody>
-        </table>
-      </div>
+      <section class="panel">
+        <h2 id="leagueTitle">리그 순위표</h2>
 
-      <p id="scorersMessage" class="message"></p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>순위</th>
+                <th>팀</th>
+                <th>경기</th>
+                <th>승</th>
+                <th>무</th>
+                <th>패</th>
+                <th>득점</th>
+                <th>실점</th>
+                <th>득실차</th>
+                <th>승점</th>
+                <th>상세</th>
+                <th>팔로우</th>
+                <th>좋아요</th>
+              </tr>
+            </thead>
 
-      <div id="playerDetail"></div>
+            <tbody id="standingsTable"></tbody>
+          </table>
+        </div>
+
+        <p id="standingMessage" class="message"></p>
+      </section>
+
+      <section class="panel">
+        <h2 id="matchTitle">경기 일정</h2>
+
+        <div class="controls">
+          <label>
+            시작일
+            <input type="date" id="dateFrom" />
+          </label>
+
+          <label>
+            종료일
+            <input type="date" id="dateTo" />
+          </label>
+
+          <select id="matchStatus">
+            <option value="SCHEDULED">예정 경기</option>
+            <option value="FINISHED">종료 경기</option>
+            <option value="LIVE">진행 중</option>
+          </select>
+
+          <button onclick="loadMatches()">조회</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>라운드</th>
+                <th>홈팀</th>
+                <th>스코어</th>
+                <th>원정팀</th>
+                <th>상태</th>
+                <th>입장</th>
+                <th>좋아요</th>
+              </tr>
+            </thead>
+
+            <tbody id="matchesTable"></tbody>
+          </table>
+        </div>
+
+        <p id="matchMessage" class="message"></p>
+      </section>
+
+      <section class="panel">
+        <h2 id="scorersTitle">선수 득점 순위</h2>
+
+        <div class="controls">
+          <label>
+            표시 인원
+            <input type="number" id="scorerLimit" value="20" min="1" max="100" />
+          </label>
+
+          <button onclick="loadScorers()">득점 순위 조회</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>순위</th>
+                <th>선수</th>
+                <th>팀</th>
+                <th>포지션</th>
+                <th>국적</th>
+                <th>골</th>
+                <th>도움</th>
+                <th>PK</th>
+                <th>상세</th>
+                <th>팔로우</th>
+                <th>좋아요</th>
+              </tr>
+            </thead>
+
+            <tbody id="scorersTable"></tbody>
+          </table>
+        </div>
+
+        <p id="scorersMessage" class="message"></p>
+
+        <div id="playerDetail"></div>
+      </section>
+
+      <section class="panel">
+        <h2>팀 / 선수 상세</h2>
+        <div id="teamDetail"></div>
+      </section>
     </section>
   </main>
 
   <script>
     let currentUser = null;
+    let currentMatch = null;
+
+    const itemCache = {};
+    const teamCache = {};
+    const playerCache = {};
+    const matchCache = {};
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function cacheKey(itemType, itemId) {
+      return `${itemType}:${itemId}`;
+    }
+
+    function setItemCache(item) {
+      itemCache[cacheKey(item.itemType, item.itemId)] = item;
+    }
+
+    function getItemCache(itemType, itemId) {
+      return itemCache[cacheKey(itemType, itemId)];
+    }
 
     function setDefaultDates() {
-      const dateFromInput = document.getElementById("dateFrom");
-      const dateToInput = document.getElementById("dateTo");
-
       const today = new Date();
       const after30Days = new Date();
+
       after30Days.setDate(today.getDate() + 30);
 
-      dateFromInput.value = today.toISOString().split("T")[0];
-      dateToInput.value = after30Days.toISOString().split("T")[0];
+      document.getElementById("dateFrom").value = today.toISOString().split("T")[0];
+      document.getElementById("dateTo").value = after30Days.toISOString().split("T")[0];
+    }
+
+    function showAuthView() {
+      document.getElementById("authView").classList.remove("hidden");
+      document.getElementById("appView").classList.add("hidden");
+    }
+
+    function showAppView() {
+      document.getElementById("authView").classList.add("hidden");
+      document.getElementById("appView").classList.remove("hidden");
     }
 
     async function requestJson(url, options = {}) {
@@ -514,10 +713,8 @@
 
       try {
         data = JSON.parse(text);
-      } catch (error) {
-        throw new Error(
-          "API 응답이 JSON이 아닙니다. http://localhost:3000 주소로 접속했는지 확인하세요."
-        );
+      } catch {
+        throw new Error("API 응답이 JSON이 아닙니다. http://localhost:3000 주소로 접속했는지 확인하세요.");
       }
 
       if (!response.ok) {
@@ -536,28 +733,29 @@
       }
 
       userStatus.innerHTML = `
-        <strong>${currentUser.nickname}</strong>님 로그인 중<br>
-        나이: ${currentUser.age}<br>
-        이메일: ${currentUser.email}
+        <strong>${escapeHtml(currentUser.nickname)}</strong>님 로그인 중<br>
+        나이: ${escapeHtml(currentUser.age)}<br>
+        이메일: ${escapeHtml(currentUser.email)}
       `;
     }
 
     async function checkLoginStatus() {
       try {
         const data = await requestJson("/api/me");
-        currentUser = data.user;
-      } catch (error) {
-        currentUser = null;
-      }
 
-      updateUserStatus();
+        currentUser = data.user;
+
+        showAppView();
+        updateUserStatus();
+
+        await loadAll();
+      } catch {
+        currentUser = null;
+        showAuthView();
+      }
     }
 
     async function signup() {
-      const nickname = document.getElementById("signupNickname").value;
-      const age = document.getElementById("signupAge").value;
-      const email = document.getElementById("signupEmail").value;
-      const password = document.getElementById("signupPassword").value;
       const signupMessage = document.getElementById("signupMessage");
 
       signupMessage.textContent = "회원가입 처리 중...";
@@ -570,33 +768,31 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            nickname,
-            age,
-            email,
-            password
+            nickname: document.getElementById("signupNickname").value,
+            age: document.getElementById("signupAge").value,
+            email: document.getElementById("signupEmail").value,
+            password: document.getElementById("signupPassword").value
           })
         });
 
         currentUser = data.user;
 
-        signupMessage.textContent = "회원가입이 완료되었습니다.";
-        signupMessage.className = "message success-message";
+        signupMessage.textContent = "";
 
-        document.getElementById("signupNickname").value = "";
-        document.getElementById("signupAge").value = "";
-        document.getElementById("signupEmail").value = "";
-        document.getElementById("signupPassword").value = "";
+        ["signupNickname", "signupAge", "signupEmail", "signupPassword"].forEach(id => {
+          document.getElementById(id).value = "";
+        });
 
+        showAppView();
         updateUserStatus();
+
+        await loadAll();
       } catch (error) {
         signupMessage.textContent = error.message;
-        signupMessage.className = "message";
       }
     }
 
     async function login() {
-      const email = document.getElementById("loginEmail").value;
-      const password = document.getElementById("loginPassword").value;
       const loginMessage = document.getElementById("loginMessage");
 
       loginMessage.textContent = "로그인 처리 중...";
@@ -609,52 +805,43 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            email,
-            password
+            email: document.getElementById("loginEmail").value,
+            password: document.getElementById("loginPassword").value
           })
         });
 
         currentUser = data.user;
 
-        loginMessage.textContent = "로그인 성공";
-        loginMessage.className = "message success-message";
-
+        loginMessage.textContent = "";
         document.getElementById("loginEmail").value = "";
         document.getElementById("loginPassword").value = "";
 
+        showAppView();
         updateUserStatus();
+
+        await loadAll();
       } catch (error) {
         loginMessage.textContent = error.message;
-        loginMessage.className = "message";
       }
     }
 
     async function logout() {
-      const loginMessage = document.getElementById("loginMessage");
-
       try {
         await requestJson("/api/logout", {
           method: "POST"
         });
 
         currentUser = null;
-
-        loginMessage.textContent = "로그아웃되었습니다.";
-        loginMessage.className = "message success-message";
-
-        updateUserStatus();
+        showAuthView();
       } catch (error) {
-        loginMessage.textContent = error.message;
-        loginMessage.className = "message";
+        alert(error.message);
       }
     }
 
     function getCrestImage(src, name) {
-      if (!src) {
-        return "";
-      }
-
-      return `<img src="${src}" alt="${name}">`;
+      return src
+        ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(name)}">`
+        : "";
     }
 
     function formatKoreanTime(utcDate) {
@@ -673,11 +860,7 @@
     }
 
     function formatDateOnly(dateText) {
-      if (!dateText) {
-        return "-";
-      }
-
-      return String(dateText).split("T")[0];
+      return dateText ? String(dateText).split("T")[0] : "-";
     }
 
     function formatScore(match) {
@@ -691,6 +874,648 @@
       }
 
       return `${match.homeScore} : ${match.awayScore}`;
+    }
+
+    function safeDomId(text) {
+      return String(text).replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    function saveTeamCache(team) {
+      const id = String(team.teamId || team.id);
+
+      const item = {
+        itemType: "team",
+        itemId: id,
+        itemName: team.teamName || team.name,
+        itemMeta: {
+          crest: team.crest,
+          shortName: team.shortName,
+          tla: team.tla,
+          venue: team.venue
+        }
+      };
+
+      teamCache[id] = item;
+      setItemCache(item);
+    }
+
+    function savePlayerCache(player) {
+      const id = String(player.playerId || player.id);
+
+      const item = {
+        itemType: "player",
+        itemId: id,
+        itemName: player.playerName || player.name,
+        itemMeta: {
+          position: player.position,
+          nationality: player.nationality,
+          teamName: player.teamName,
+          teamCrest: player.teamCrest
+        }
+      };
+
+      playerCache[id] = item;
+      setItemCache(item);
+    }
+
+    function saveMatchCache(match) {
+      const id = String(match.id);
+
+      const item = {
+        itemType: "match",
+        itemId: id,
+        itemName: `${match.homeTeam} vs ${match.awayTeam}`,
+        itemMeta: {
+          utcDate: match.utcDate,
+          homeTeam: match.homeTeam,
+          awayTeam: match.awayTeam,
+          homeCrest: match.homeCrest,
+          awayCrest: match.awayCrest,
+          competition: match.competition,
+          status: match.status
+        }
+      };
+
+      matchCache[id] = item;
+      setItemCache(item);
+    }
+
+    async function followCachedItem(itemType, itemId) {
+      const item = getItemCache(itemType, itemId);
+
+      if (!item) {
+        alert("팔로우할 대상 정보를 찾지 못했습니다.");
+        return;
+      }
+
+      try {
+        await requestJson("/api/follows", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(item)
+        });
+
+        await loadProfile();
+
+        alert("팔로우가 완료되었습니다.");
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    async function unfollowItem(itemType, itemId) {
+      try {
+        await requestJson(`/api/follows/${itemType}/${itemId}`, {
+          method: "DELETE"
+        });
+
+        await loadProfile();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    async function refreshLikeButton(itemType, itemId) {
+      const button = document.getElementById(`like-${itemType}-${safeDomId(itemId)}`);
+
+      if (!button) {
+        return;
+      }
+
+      try {
+        const data = await requestJson(`/api/likes/${itemType}/${itemId}`);
+
+        button.textContent = data.liked ? `♥ ${data.count}` : `♡ ${data.count}`;
+        button.className = data.liked ? "danger-btn" : "muted-btn";
+      } catch {
+        button.textContent = "♡";
+      }
+    }
+
+    async function toggleLike(itemType, itemId) {
+      const item = getItemCache(itemType, itemId);
+
+      if (!item) {
+        alert("좋아요 대상 정보를 찾지 못했습니다.");
+        return;
+      }
+
+      try {
+        const info = await requestJson(`/api/likes/${itemType}/${itemId}`);
+
+        if (info.liked) {
+          await requestJson(`/api/likes/${itemType}/${itemId}`, {
+            method: "DELETE"
+          });
+        } else {
+          await requestJson("/api/likes", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(item)
+          });
+        }
+
+        await refreshLikeButton(itemType, itemId);
+        await loadHot();
+
+        if (currentMatch && itemType === "match" && String(currentMatch.itemId) === String(itemId)) {
+          await loadMatchRoom(itemId);
+        }
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    function renderLikeButton(itemType, itemId) {
+      const id = `like-${itemType}-${safeDomId(itemId)}`;
+
+      setTimeout(() => refreshLikeButton(itemType, itemId), 0);
+
+      return `<button id="${id}" class="muted-btn" onclick="toggleLike('${itemType}', '${escapeHtml(itemId)}')">♡</button>`;
+    }
+
+    function renderHotCard(item) {
+      setItemCache({
+        itemType: item.itemType,
+        itemId: item.itemId,
+        itemName: item.itemName,
+        itemMeta: item.itemMeta || {}
+      });
+
+      const meta = item.itemMeta || {};
+      const image = item.itemType === "team"
+        ? getCrestImage(meta.crest, item.itemName)
+        : item.itemType === "player"
+          ? getCrestImage(meta.teamCrest, item.itemName)
+          : "";
+
+      const detailButton = item.itemType === "team"
+        ? `<button class="secondary-btn" onclick="loadTeamDetail('${escapeHtml(item.itemId)}')">상세</button>`
+        : item.itemType === "player"
+          ? `<button class="secondary-btn" onclick="loadPlayerDetail('${escapeHtml(item.itemId)}')">상세</button>`
+          : `<button class="secondary-btn" onclick="openMatchRoom('${escapeHtml(item.itemId)}')">입장</button>`;
+
+      return `
+        <div class="hot-card">
+          <div class="team">
+            ${image}
+            <strong>${escapeHtml(item.itemName)}</strong>
+          </div>
+          <p class="small">이번 주 좋아요 ${escapeHtml(item.likeCount)}개</p>
+          <div class="controls">
+            ${detailButton}
+            ${renderLikeButton(item.itemType, item.itemId)}
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadHot() {
+      const hotMessage = document.getElementById("hotMessage");
+
+      hotMessage.textContent = "HOT 목록을 불러오는 중...";
+      hotMessage.className = "message";
+
+      try {
+        const data = await requestJson("/api/hot");
+
+        document.getElementById("hotTeams").innerHTML = data.teams.length
+          ? data.teams.map(renderHotCard).join("")
+          : `<p class="small">HOT 팀이 없습니다.</p>`;
+
+        document.getElementById("hotPlayers").innerHTML = data.players.length
+          ? data.players.map(renderHotCard).join("")
+          : `<p class="small">HOT 선수가 없습니다.</p>`;
+
+        document.getElementById("hotMatches").innerHTML = data.matches.length
+          ? data.matches.map(renderHotCard).join("")
+          : `<p class="small">HOT 경기가 없습니다.</p>`;
+
+        hotMessage.textContent = `이번 주 기준: ${escapeHtml(data.weekKey)}`;
+        hotMessage.className = "message success-message";
+      } catch (error) {
+        hotMessage.textContent = error.message;
+      }
+    }
+
+    function renderFollowCard(item) {
+      const meta = item.itemMeta || {};
+      const isTeam = item.itemType === "team";
+
+      setItemCache(item);
+
+      const image = isTeam
+        ? getCrestImage(meta.crest, item.itemName)
+        : getCrestImage(meta.teamCrest, item.itemName);
+
+      const subText = isTeam
+        ? meta.venue || meta.shortName || "-"
+        : `${meta.teamName || "-"} · ${meta.position || "-"}`;
+
+      const detailCall = isTeam
+        ? `loadTeamDetail('${escapeHtml(item.itemId)}')`
+        : `loadPlayerDetail('${escapeHtml(item.itemId)}')`;
+
+      return `
+        <div class="follow-card">
+          <div class="follow-main">
+            ${image}
+            <div>
+              <strong>${escapeHtml(item.itemName)}</strong>
+              <span class="small">${escapeHtml(subText)}</span>
+            </div>
+          </div>
+
+          <div class="follow-actions">
+            <button class="secondary-btn" onclick="${detailCall}">상세</button>
+            ${renderLikeButton(item.itemType, item.itemId)}
+            <button class="danger-btn" onclick="unfollowItem('${item.itemType}', '${escapeHtml(item.itemId)}')">해제</button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadProfile() {
+      if (!currentUser) {
+        return;
+      }
+
+      const profileInfo = document.getElementById("profileInfo");
+      const followedTeams = document.getElementById("followedTeams");
+      const followedPlayers = document.getElementById("followedPlayers");
+      const profileMessage = document.getElementById("profileMessage");
+
+      profileInfo.innerHTML = `
+        <div class="info-box">
+          <span>닉네임</span>
+          <strong>${escapeHtml(currentUser.nickname)}</strong>
+        </div>
+
+        <div class="info-box">
+          <span>나이</span>
+          <strong>${escapeHtml(currentUser.age)}</strong>
+        </div>
+
+        <div class="info-box">
+          <span>이메일</span>
+          <strong>${escapeHtml(currentUser.email)}</strong>
+        </div>
+      `;
+
+      profileMessage.textContent = "프로필을 불러오는 중...";
+      profileMessage.className = "message";
+
+      try {
+        const data = await requestJson("/api/follows");
+
+        followedTeams.innerHTML = data.teams.length
+          ? data.teams.map(renderFollowCard).join("")
+          : `<p class="small">팔로우한 팀이 없습니다.</p>`;
+
+        followedPlayers.innerHTML = data.players.length
+          ? data.players.map(renderFollowCard).join("")
+          : `<p class="small">팔로우한 선수가 없습니다.</p>`;
+
+        await renderFollowedTeamMatches(data.teams);
+
+        profileMessage.textContent = "프로필이 업데이트되었습니다.";
+        profileMessage.className = "message success-message";
+      } catch (error) {
+        profileMessage.textContent = error.message;
+      }
+    }
+
+    async function renderFollowedTeamMatches(teams) {
+      const container = document.getElementById("followedTeamMatches");
+
+      if (!teams.length) {
+        container.innerHTML = `<p class="small">팔로우한 팀의 경기 일정이 없습니다.</p>`;
+        return;
+      }
+
+      const cards = [];
+
+      for (const team of teams) {
+        try {
+          const data = await requestJson(`/api/team/${team.itemId}/matches?status=SCHEDULED&limit=5`);
+
+          data.matches.forEach(match => {
+            match.competition = match.competition || "-";
+
+            saveMatchCache(match);
+
+            cards.push(renderMatchCard(match, team.itemName));
+          });
+        } catch {
+          cards.push(`<div class="match-card">${escapeHtml(team.itemName)} 경기 일정을 불러오지 못했습니다.</div>`);
+        }
+      }
+
+      container.innerHTML = cards.length
+        ? cards.join("")
+        : `<p class="small">예정 경기가 없습니다.</p>`;
+    }
+
+    function renderMatchCard(match, followedTeamName = "") {
+      const item = matchCache[String(match.id)];
+
+      return `
+        <div class="match-card">
+          <div class="match-card-title">${escapeHtml(match.homeTeam)} vs ${escapeHtml(match.awayTeam)}</div>
+          <div class="small">${escapeHtml(formatKoreanTime(match.utcDate))}</div>
+          <div class="small">${followedTeamName ? `팔로우 팀: ${escapeHtml(followedTeamName)}` : ""}</div>
+
+          <div class="controls" style="margin-top: 10px;">
+            <button class="secondary-btn" onclick="openMatchRoom('${match.id}')">경기 창 입장</button>
+            ${renderLikeButton(item.itemType, item.itemId)}
+          </div>
+        </div>
+      `;
+    }
+
+    async function openMatchRoom(matchId) {
+      await loadMatchRoom(matchId);
+
+      document.getElementById("matchRoomPanel").classList.remove("hidden");
+      document.getElementById("matchRoomPanel").scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }
+
+    async function loadMatchRoom(matchId) {
+      const cached = matchCache[String(matchId)] || {
+        itemType: "match",
+        itemId: String(matchId),
+        itemName: `Match ${matchId}`,
+        itemMeta: {}
+      };
+
+      currentMatch = cached;
+
+      const data = await requestJson(`/api/match-room/${matchId}`);
+      const meta = cached.itemMeta || {};
+
+      document.getElementById("matchRoomTitle").textContent = cached.itemName;
+      document.getElementById("matchRoomMeta").innerHTML = `
+        ${escapeHtml(formatKoreanTime(meta.utcDate))} · ${escapeHtml(meta.status || "-")}
+      `;
+
+      document.getElementById("matchLikeButton").textContent = data.like.liked
+        ? `♥ 이번 주 ${data.like.count}`
+        : `♡ 이번 주 ${data.like.count}`;
+
+      document.getElementById("matchLikeButton").className = data.like.liked
+        ? "danger-btn"
+        : "muted-btn";
+
+      const total = data.averageScore.count || 0;
+
+      document.getElementById("predictionStats").innerHTML = `
+        <div class="info-box">
+          <span>홈 승 예측</span>
+          <strong>${data.predictionStats.home}</strong>
+        </div>
+
+        <div class="info-box">
+          <span>무승부 예측</span>
+          <strong>${data.predictionStats.draw}</strong>
+        </div>
+
+        <div class="info-box">
+          <span>원정 승 예측</span>
+          <strong>${data.predictionStats.away}</strong>
+        </div>
+
+        <div class="info-box">
+          <span>평균 스코어</span>
+          <strong>${total ? `${data.averageScore.homeAvg} : ${data.averageScore.awayAvg}` : "-"}</strong>
+        </div>
+      `;
+
+      if (data.myPrediction) {
+        document.getElementById("predictionResult").value = data.myPrediction.prediction_result;
+        document.getElementById("predHomeScore").value = data.myPrediction.home_score;
+        document.getElementById("predAwayScore").value = data.myPrediction.away_score;
+      }
+
+      renderComments("match", matchId, cached.itemName, cached.itemMeta, data.comments, "matchCommentsList");
+    }
+
+    async function likeMatchRoom() {
+      if (!currentMatch) {
+        return;
+      }
+
+      await toggleLike(currentMatch.itemType, currentMatch.itemId);
+    }
+
+    function normalizePredictionScore() {
+      const result = document.getElementById("predictionResult").value;
+      const homeInput = document.getElementById("predHomeScore");
+      const awayInput = document.getElementById("predAwayScore");
+
+      let home = Number(homeInput.value);
+      let away = Number(awayInput.value);
+
+      if (!Number.isInteger(home) || home < 0) {
+        home = 0;
+      }
+
+      if (!Number.isInteger(away) || away < 0) {
+        away = 0;
+      }
+
+      if (result === "home" && home <= away) {
+        home = away + 1;
+      }
+
+      if (result === "away" && away <= home) {
+        away = home + 1;
+      }
+
+      if (result === "draw") {
+        const maxScore = Math.max(home, away);
+        home = maxScore;
+        away = maxScore;
+      }
+
+      homeInput.value = home;
+      awayInput.value = away;
+    }
+
+    async function savePrediction() {
+      if (!currentMatch) {
+        return;
+      }
+
+      normalizePredictionScore();
+
+      const predictionMessage = document.getElementById("predictionMessage");
+
+      predictionMessage.textContent = "예측 저장 중...";
+      predictionMessage.className = "message";
+
+      try {
+        await requestJson(`/api/match-room/${currentMatch.itemId}/prediction`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            predictionResult: document.getElementById("predictionResult").value,
+            homeScore: document.getElementById("predHomeScore").value,
+            awayScore: document.getElementById("predAwayScore").value,
+            matchMeta: currentMatch.itemMeta
+          })
+        });
+
+        predictionMessage.textContent = "예측이 저장되었습니다.";
+        predictionMessage.className = "message success-message";
+
+        await loadMatchRoom(currentMatch.itemId);
+      } catch (error) {
+        predictionMessage.textContent = error.message;
+      }
+    }
+
+    async function saveComment(itemType, itemId, itemName, itemMeta, parentCommentId, textareaId) {
+      const textarea = document.getElementById(textareaId);
+
+      try {
+        await requestJson("/api/comments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            itemType,
+            itemId,
+            itemName,
+            itemMeta,
+            parentCommentId,
+            body: textarea.value
+          })
+        });
+
+        textarea.value = "";
+
+        await reloadComments(itemType, itemId, itemName, itemMeta);
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    async function reloadComments(itemType, itemId, itemName, itemMeta) {
+      const data = await requestJson(`/api/comments/${itemType}/${itemId}`);
+
+      const containerId = itemType === "match"
+        ? "matchCommentsList"
+        : `${itemType}Comments-${safeDomId(itemId)}`;
+
+      renderComments(itemType, itemId, itemName, itemMeta, data.comments, containerId);
+    }
+
+    async function toggleCommentLike(commentId, itemType, itemId, itemName, itemMeta) {
+      try {
+        const info = await requestJson(`/api/comment-likes/${commentId}`);
+
+        if (info.liked) {
+          await requestJson(`/api/comment-likes/${commentId}`, {
+            method: "DELETE"
+          });
+        } else {
+          await requestJson(`/api/comment-likes/${commentId}`, {
+            method: "POST"
+          });
+        }
+
+        await reloadComments(itemType, itemId, itemName, itemMeta);
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    function renderComments(itemType, itemId, itemName, itemMeta, comments, containerId) {
+      const container = document.getElementById(containerId);
+
+      if (!container) {
+        return;
+      }
+
+      const topLevel = comments.filter(comment => !comment.parentCommentId);
+      const repliesByParent = {};
+
+      comments
+        .filter(comment => comment.parentCommentId)
+        .forEach(comment => {
+          if (!repliesByParent[comment.parentCommentId]) {
+            repliesByParent[comment.parentCommentId] = [];
+          }
+
+          repliesByParent[comment.parentCommentId].push(comment);
+        });
+
+      if (!topLevel.length) {
+        container.innerHTML = `<p class="small">이번 주 댓글이 없습니다.</p>`;
+        return;
+      }
+
+      container.innerHTML = topLevel.map(comment => renderCommentBlock(
+        comment,
+        repliesByParent[comment.id] || [],
+        itemType,
+        itemId,
+        itemName,
+        itemMeta
+      )).join("");
+    }
+
+    function renderCommentBlock(comment, replies, itemType, itemId, itemName, itemMeta) {
+      const replyTextareaId = `reply-${comment.id}`;
+
+      return `
+        <div class="comment">
+          <strong>${escapeHtml(comment.nickname)}</strong>
+          <span class="small">${escapeHtml(formatKoreanTime(comment.createdAt))}</span>
+
+          <div>${escapeHtml(comment.body)}</div>
+
+          <div class="comment-actions">
+            <button class="${comment.like.liked ? "danger-btn" : "muted-btn"}"
+              onclick='toggleCommentLike(${comment.id}, "${itemType}", "${escapeHtml(itemId)}", ${JSON.stringify(itemName)}, ${JSON.stringify(itemMeta || {})})'>
+              ${comment.like.liked ? "♥" : "♡"} ${comment.like.count}
+            </button>
+          </div>
+
+          <div class="reply-box">
+            <textarea id="${replyTextareaId}" placeholder="대댓글을 입력하세요."></textarea>
+            <button onclick='saveComment("${itemType}", "${escapeHtml(itemId)}", ${JSON.stringify(itemName)}, ${JSON.stringify(itemMeta || {})}, ${comment.id}, "${replyTextareaId}")'>
+              대댓글 등록
+            </button>
+          </div>
+
+          ${replies.map(reply => `
+            <div class="comment reply">
+              <strong>${escapeHtml(reply.nickname)}</strong>
+              <span class="small">${escapeHtml(formatKoreanTime(reply.createdAt))}</span>
+
+              <div>${escapeHtml(reply.body)}</div>
+
+              <div class="comment-actions">
+                <button class="${reply.like.liked ? "danger-btn" : "muted-btn"}"
+                  onclick='toggleCommentLike(${reply.id}, "${itemType}", "${escapeHtml(itemId)}", ${JSON.stringify(itemName)}, ${JSON.stringify(itemMeta || {})})'>
+                  ${reply.like.liked ? "♥" : "♡"} ${reply.like.count}
+                </button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
     }
 
     async function loadStandings() {
@@ -711,35 +1536,45 @@
         message.className = "message success-message";
 
         data.table.forEach(team => {
+          saveTeamCache(team);
+
+          const item = getItemCache("team", team.teamId);
           const row = document.createElement("tr");
 
           row.innerHTML = `
-            <td class="rank">${team.position}</td>
+            <td class="rank">${escapeHtml(team.position)}</td>
+
             <td>
               <div class="team">
                 ${getCrestImage(team.crest, team.teamName)}
-                ${team.teamName}
+                ${escapeHtml(team.teamName)}
               </div>
             </td>
-            <td>${team.played}</td>
-            <td>${team.won}</td>
-            <td>${team.draw}</td>
-            <td>${team.lost}</td>
-            <td>${team.goalsFor}</td>
-            <td>${team.goalsAgainst}</td>
-            <td>${team.goalDifference}</td>
-            <td><strong>${team.points}</strong></td>
-            <td>${team.form || "-"}</td>
+
+            <td>${escapeHtml(team.played)}</td>
+            <td>${escapeHtml(team.won)}</td>
+            <td>${escapeHtml(team.draw)}</td>
+            <td>${escapeHtml(team.lost)}</td>
+            <td>${escapeHtml(team.goalsFor)}</td>
+            <td>${escapeHtml(team.goalsAgainst)}</td>
+            <td>${escapeHtml(team.goalDifference)}</td>
+            <td><strong>${escapeHtml(team.points)}</strong></td>
+
             <td>
-              <button class="secondary-btn" onclick="loadTeamDetail(${team.teamId})">보기</button>
+              <button class="secondary-btn" onclick="loadTeamDetail('${team.teamId}')">보기</button>
             </td>
+
+            <td>
+              <button onclick="followCachedItem('team', '${team.teamId}')">팔로우</button>
+            </td>
+
+            <td>${renderLikeButton(item.itemType, item.itemId)}</td>
           `;
 
           tableBody.appendChild(row);
         });
       } catch (error) {
         message.textContent = error.message;
-        message.className = "message";
       }
     }
 
@@ -768,9 +1603,8 @@
 
         matchTitle.textContent = `${data.competition} 경기 일정`;
 
-        if (data.matches.length === 0) {
+        if (!data.matches.length) {
           matchMessage.textContent = "조회된 경기 일정이 없습니다.";
-          matchMessage.className = "message";
           return;
         }
 
@@ -778,145 +1612,153 @@
         matchMessage.className = "message success-message";
 
         data.matches.forEach(match => {
+          saveMatchCache(match);
+
+          const item = getItemCache("match", match.id);
           const row = document.createElement("tr");
 
           row.innerHTML = `
-            <td>${formatKoreanTime(match.utcDate)}</td>
-            <td>${match.matchday || "-"}</td>
+            <td>${escapeHtml(formatKoreanTime(match.utcDate))}</td>
+            <td>${escapeHtml(match.matchday || "-")}</td>
+
             <td>
               <div class="team">
                 ${getCrestImage(match.homeCrest, match.homeTeam)}
-                ${match.homeTeam}
+                ${escapeHtml(match.homeTeam)}
               </div>
             </td>
-            <td class="score">${formatScore(match)}</td>
+
+            <td class="score">${escapeHtml(formatScore(match))}</td>
+
             <td>
               <div class="team">
                 ${getCrestImage(match.awayCrest, match.awayTeam)}
-                ${match.awayTeam}
+                ${escapeHtml(match.awayTeam)}
               </div>
             </td>
-            <td>${match.status}</td>
+
+            <td>${escapeHtml(match.status)}</td>
+
+            <td>
+              <button class="secondary-btn" onclick="openMatchRoom('${match.id}')">입장</button>
+            </td>
+
+            <td>${renderLikeButton(item.itemType, item.itemId)}</td>
           `;
 
           matchesTable.appendChild(row);
         });
       } catch (error) {
         matchMessage.textContent = error.message;
-        matchMessage.className = "message";
-      }
-    }
-
-    async function loadTeams() {
-      const competition = document.getElementById("competition").value;
-      const teamsTable = document.getElementById("teamsTable");
-      const teamsMessage = document.getElementById("teamsMessage");
-      const teamsTitle = document.getElementById("teamsTitle");
-
-      teamsTable.innerHTML = "";
-      teamsMessage.textContent = "팀 목록을 불러오는 중...";
-      teamsMessage.className = "message";
-
-      try {
-        const data = await requestJson(`/api/teams/${competition}`);
-
-        teamsTitle.textContent = `${data.competition} 팀 목록`;
-        teamsMessage.textContent = `총 ${data.teams.length}개 팀을 불러왔습니다.`;
-        teamsMessage.className = "message success-message";
-
-        data.teams.forEach(team => {
-          const row = document.createElement("tr");
-
-          row.innerHTML = `
-            <td>
-              <div class="team">
-                ${getCrestImage(team.crest, team.name)}
-                ${team.name}
-              </div>
-            </td>
-            <td>${team.tla || "-"}</td>
-            <td>${team.founded || "-"}</td>
-            <td>${team.venue || "-"}</td>
-            <td>${team.squadCount}</td>
-            <td>
-              <button class="secondary-btn" onclick="loadTeamDetail(${team.id})">보기</button>
-            </td>
-          `;
-
-          teamsTable.appendChild(row);
-        });
-      } catch (error) {
-        teamsMessage.textContent = error.message;
-        teamsMessage.className = "message";
       }
     }
 
     async function loadTeamDetail(teamId) {
       const teamDetail = document.getElementById("teamDetail");
 
-      teamDetail.innerHTML = `
-        <div class="detail-card">
-          팀 세부 정보를 불러오는 중...
-        </div>
-      `;
+      teamDetail.innerHTML = `<div class="detail-card">팀 세부 정보를 불러오는 중...</div>`;
 
       try {
         const team = await requestJson(`/api/team/${teamId}`);
         const scheduledMatches = await requestJson(`/api/team/${teamId}/matches?status=SCHEDULED&limit=5`);
 
-        const squadRows = team.squad.map(player => `
-          <tr>
-            <td>${player.name}</td>
-            <td>${player.position || "-"}</td>
-            <td>${formatDateOnly(player.dateOfBirth)}</td>
-            <td>${player.nationality || "-"}</td>
-            <td>${player.role || "-"}</td>
-            <td>
-              <button class="secondary-btn" onclick="loadPlayerDetail(${player.id})">선수 보기</button>
-            </td>
-          </tr>
-        `).join("");
+        saveTeamCache(team);
 
-        const matchRows = scheduledMatches.matches.map(match => `
-          <tr>
-            <td>${formatKoreanTime(match.utcDate)}</td>
-            <td>${match.competition || "-"}</td>
-            <td>${match.homeTeam}</td>
-            <td class="score">${formatScore(match)}</td>
-            <td>${match.awayTeam}</td>
-            <td>${match.status}</td>
-          </tr>
-        `).join("");
+        const teamItem = getItemCache("team", team.id);
+        const commentsData = await requestJson(`/api/comments/team/${team.id}`);
+
+        const commentsContainerId = `teamComments-${safeDomId(team.id)}`;
+
+        const squadRows = team.squad.map(player => {
+          savePlayerCache({
+            id: player.id,
+            name: player.name,
+            position: player.position,
+            nationality: player.nationality,
+            teamName: team.name,
+            teamCrest: team.crest
+          });
+
+          const playerItem = getItemCache("player", player.id);
+
+          return `
+            <tr>
+              <td>${escapeHtml(player.name)}</td>
+              <td>${escapeHtml(player.position || "-")}</td>
+              <td>${escapeHtml(formatDateOnly(player.dateOfBirth))}</td>
+              <td>${escapeHtml(player.nationality || "-")}</td>
+
+              <td>
+                <button class="secondary-btn" onclick="loadPlayerDetail('${player.id}')">선수 보기</button>
+              </td>
+
+              <td>
+                <button onclick="followCachedItem('player', '${player.id}')">팔로우</button>
+              </td>
+
+              <td>${renderLikeButton(playerItem.itemType, playerItem.itemId)}</td>
+            </tr>
+          `;
+        }).join("");
+
+        const matchRows = scheduledMatches.matches.map(match => {
+          match.competition = match.competition || "-";
+
+          saveMatchCache(match);
+
+          const item = getItemCache("match", match.id);
+
+          return `
+            <tr>
+              <td>${escapeHtml(formatKoreanTime(match.utcDate))}</td>
+              <td>${escapeHtml(match.competition || "-")}</td>
+              <td>${escapeHtml(match.homeTeam)}</td>
+              <td class="score">${escapeHtml(formatScore(match))}</td>
+              <td>${escapeHtml(match.awayTeam)}</td>
+              <td>${escapeHtml(match.status)}</td>
+
+              <td>
+                <button class="secondary-btn" onclick="openMatchRoom('${match.id}')">입장</button>
+              </td>
+
+              <td>${renderLikeButton(item.itemType, item.itemId)}</td>
+            </tr>
+          `;
+        }).join("");
 
         teamDetail.innerHTML = `
           <div class="detail-card">
             <div class="detail-header">
               ${getCrestImage(team.crest, team.name)}
+
               <div>
-                <h2>${team.name}</h2>
-                <p class="small">${team.shortName || "-"} · ${team.tla || "-"}</p>
+                <h2>${escapeHtml(team.name)}</h2>
+                <p class="small">${escapeHtml(team.shortName || "-")} · ${escapeHtml(team.tla || "-")}</p>
+
+                <button onclick="followCachedItem('team', '${team.id}')">팀 팔로우</button>
+                ${renderLikeButton(teamItem.itemType, teamItem.itemId)}
               </div>
             </div>
 
             <div class="info-grid">
               <div class="info-box">
                 <span>창단</span>
-                <strong>${team.founded || "-"}</strong>
+                <strong>${escapeHtml(team.founded || "-")}</strong>
               </div>
 
               <div class="info-box">
                 <span>홈구장</span>
-                <strong>${team.venue || "-"}</strong>
+                <strong>${escapeHtml(team.venue || "-")}</strong>
               </div>
 
               <div class="info-box">
                 <span>팀 컬러</span>
-                <strong>${team.clubColors || "-"}</strong>
+                <strong>${escapeHtml(team.clubColors || "-")}</strong>
               </div>
 
               <div class="info-box">
                 <span>웹사이트</span>
-                <strong>${team.website ? `<a href="${team.website}" target="_blank">바로가기</a>` : "-"}</strong>
+                <strong>${team.website ? `<a href="${escapeHtml(team.website)}" target="_blank">바로가기</a>` : "-"}</strong>
               </div>
             </div>
 
@@ -931,10 +1773,13 @@
                     <th>스코어</th>
                     <th>원정팀</th>
                     <th>상태</th>
+                    <th>입장</th>
+                    <th>좋아요</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  ${matchRows || `<tr><td colspan="6">예정 경기가 없습니다.</td></tr>`}
+                  ${matchRows || `<tr><td colspan="8">예정 경기가 없습니다.</td></tr>`}
                 </tbody>
               </table>
             </div>
@@ -948,25 +1793,36 @@
                     <th>포지션</th>
                     <th>생년월일</th>
                     <th>국적</th>
-                    <th>역할</th>
                     <th>상세</th>
+                    <th>팔로우</th>
+                    <th>좋아요</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  ${squadRows || `<tr><td colspan="6">스쿼드 정보가 없습니다.</td></tr>`}
+                  ${squadRows || `<tr><td colspan="7">스쿼드 정보가 없습니다.</td></tr>`}
                 </tbody>
               </table>
             </div>
+
+            <h3>이번 주 팀 댓글</h3>
+            <textarea id="teamCommentBody-${safeDomId(team.id)}" placeholder="팀 댓글을 입력하세요."></textarea>
+            <button onclick='saveComment("team", "${team.id}", ${JSON.stringify(team.name)}, ${JSON.stringify(teamItem.itemMeta)}, null, "teamCommentBody-${safeDomId(team.id)}")'>
+              댓글 등록
+            </button>
+
+            <div id="${commentsContainerId}"></div>
           </div>
         `;
 
-        teamDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+        renderComments("team", team.id, team.name, teamItem.itemMeta, commentsData.comments, commentsContainerId);
+
+        teamDetail.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
       } catch (error) {
-        teamDetail.innerHTML = `
-          <div class="detail-card message">
-            ${error.message}
-          </div>
-        `;
+        teamDetail.innerHTML = `<div class="detail-card message">${escapeHtml(error.message)}</div>`;
       }
     }
 
@@ -990,87 +1846,111 @@
         scorersMessage.className = "message success-message";
 
         data.scorers.forEach((item, index) => {
+          savePlayerCache(item);
+
+          const playerItem = getItemCache("player", item.playerId);
           const row = document.createElement("tr");
 
           row.innerHTML = `
             <td class="rank">${index + 1}</td>
-            <td>${item.playerName}</td>
+            <td>${escapeHtml(item.playerName)}</td>
+
             <td>
               <div class="team">
                 ${getCrestImage(item.teamCrest, item.teamName)}
-                ${item.teamName}
+                ${escapeHtml(item.teamName)}
               </div>
             </td>
-            <td>${item.position || "-"}</td>
-            <td>${item.nationality || "-"}</td>
-            <td><strong>${item.goals ?? "-"}</strong></td>
-            <td>${item.assists ?? "-"}</td>
-            <td>${item.penalties ?? "-"}</td>
+
+            <td>${escapeHtml(item.position || "-")}</td>
+            <td>${escapeHtml(item.nationality || "-")}</td>
+            <td><strong>${escapeHtml(item.goals ?? "-")}</strong></td>
+            <td>${escapeHtml(item.assists ?? "-")}</td>
+            <td>${escapeHtml(item.penalties ?? "-")}</td>
+
             <td>
-              <button class="secondary-btn" onclick="loadPlayerDetail(${item.playerId})">보기</button>
+              <button class="secondary-btn" onclick="loadPlayerDetail('${item.playerId}')">보기</button>
             </td>
+
+            <td>
+              <button onclick="followCachedItem('player', '${item.playerId}')">팔로우</button>
+            </td>
+
+            <td>${renderLikeButton(playerItem.itemType, playerItem.itemId)}</td>
           `;
 
           scorersTable.appendChild(row);
         });
       } catch (error) {
         scorersMessage.textContent = error.message;
-        scorersMessage.className = "message";
       }
     }
 
     async function loadPlayerDetail(playerId) {
       const playerDetail = document.getElementById("playerDetail");
 
-      playerDetail.innerHTML = `
-        <div class="detail-card">
-          선수 세부 정보를 불러오는 중...
-        </div>
-      `;
+      playerDetail.innerHTML = `<div class="detail-card">선수 세부 정보를 불러오는 중...</div>`;
 
       try {
         const player = await requestJson(`/api/player/${playerId}`);
         const matches = await requestJson(`/api/player/${playerId}/matches?status=FINISHED&limit=5`);
 
-        const matchRows = matches.matches.map(match => `
-          <tr>
-            <td>${formatKoreanTime(match.utcDate)}</td>
-            <td>${match.competition || "-"}</td>
-            <td>${match.homeTeam}</td>
-            <td class="score">${formatScore(match)}</td>
-            <td>${match.awayTeam}</td>
-            <td>${match.status}</td>
-          </tr>
-        `).join("");
+        savePlayerCache(player);
+
+        const playerItem = getItemCache("player", player.id);
+        const commentsData = await requestJson(`/api/comments/player/${player.id}`);
+        const commentsContainerId = `playerComments-${safeDomId(player.id)}`;
+
+        const matchRows = matches.matches.map(match => {
+          saveMatchCache(match);
+
+          return `
+            <tr>
+              <td>${escapeHtml(formatKoreanTime(match.utcDate))}</td>
+              <td>${escapeHtml(match.competition || "-")}</td>
+              <td>${escapeHtml(match.homeTeam)}</td>
+              <td class="score">${escapeHtml(formatScore(match))}</td>
+              <td>${escapeHtml(match.awayTeam)}</td>
+              <td>${escapeHtml(match.status)}</td>
+
+              <td>
+                <button class="secondary-btn" onclick="openMatchRoom('${match.id}')">입장</button>
+              </td>
+            </tr>
+          `;
+        }).join("");
 
         playerDetail.innerHTML = `
           <div class="detail-card">
-            <h2>${player.name}</h2>
+            <h2>${escapeHtml(player.name)}</h2>
+
+            <button onclick="followCachedItem('player', '${player.id}')">선수 팔로우</button>
+            ${renderLikeButton(playerItem.itemType, playerItem.itemId)}
 
             <div class="info-grid">
               <div class="info-box">
                 <span>포지션</span>
-                <strong>${player.position || "-"}</strong>
+                <strong>${escapeHtml(player.position || "-")}</strong>
               </div>
 
               <div class="info-box">
                 <span>생년월일</span>
-                <strong>${formatDateOnly(player.dateOfBirth)}</strong>
+                <strong>${escapeHtml(formatDateOnly(player.dateOfBirth))}</strong>
               </div>
 
               <div class="info-box">
                 <span>출생국</span>
-                <strong>${player.countryOfBirth || "-"}</strong>
+                <strong>${escapeHtml(player.countryOfBirth || "-")}</strong>
               </div>
 
               <div class="info-box">
                 <span>국적</span>
-                <strong>${player.nationality || "-"}</strong>
+                <strong>${escapeHtml(player.nationality || "-")}</strong>
               </div>
 
               <div class="info-box">
                 <span>등번호</span>
-                <strong>${player.shirtNumber || "-"}</strong>
+                <strong>${escapeHtml(player.shirtNumber || "-")}</strong>
               </div>
             </div>
 
@@ -1085,36 +1965,47 @@
                     <th>스코어</th>
                     <th>원정팀</th>
                     <th>상태</th>
+                    <th>입장</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  ${matchRows || `<tr><td colspan="6">조회된 경기 정보가 없습니다.</td></tr>`}
+                  ${matchRows || `<tr><td colspan="7">조회된 경기 정보가 없습니다.</td></tr>`}
                 </tbody>
               </table>
             </div>
+
+            <h3>이번 주 선수 댓글</h3>
+            <textarea id="playerCommentBody-${safeDomId(player.id)}" placeholder="선수 댓글을 입력하세요."></textarea>
+            <button onclick='saveComment("player", "${player.id}", ${JSON.stringify(player.name)}, ${JSON.stringify(playerItem.itemMeta)}, null, "playerCommentBody-${safeDomId(player.id)}")'>
+              댓글 등록
+            </button>
+
+            <div id="${commentsContainerId}"></div>
           </div>
         `;
 
-        playerDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+        renderComments("player", player.id, player.name, playerItem.itemMeta, commentsData.comments, commentsContainerId);
+
+        playerDetail.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
       } catch (error) {
-        playerDetail.innerHTML = `
-          <div class="detail-card message">
-            ${error.message}
-          </div>
-        `;
+        playerDetail.innerHTML = `<div class="detail-card message">${escapeHtml(error.message)}</div>`;
       }
     }
 
     async function loadAll() {
+      await loadHot();
+      await loadProfile();
       await loadStandings();
       await loadMatches();
-      await loadTeams();
       await loadScorers();
     }
 
     setDefaultDates();
     checkLoginStatus();
-    loadAll();
   </script>
 </body>
 </html>
