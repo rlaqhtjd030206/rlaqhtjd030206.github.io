@@ -58,7 +58,9 @@
     .follow-grid,
     .match-card-grid,
     .hot-grid,
-    .hot-board-grid {
+    .hot-board-grid,
+    .ranking-grid,
+    .odds-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 12px;
@@ -71,7 +73,10 @@
     .comment,
     .match-card,
     .board-post,
-    .board-comment {
+    .board-comment,
+    .ranking-card,
+    .odds-card,
+    .bet-card {
       background: #1e293b;
       border: 1px solid #334155;
       border-radius: 14px;
@@ -234,7 +239,8 @@
       color: #86efac;
     }
 
-    .score {
+    .score,
+    .point {
       font-weight: bold;
       color: #facc15;
     }
@@ -348,6 +354,17 @@
       margin-top: 10px;
     }
 
+    .odds-card strong {
+      display: block;
+      font-size: 24px;
+      color: #facc15;
+      margin-top: 6px;
+    }
+
+    .bet-card {
+      margin-top: 16px;
+    }
+
     a {
       color: #93c5fd;
     }
@@ -409,6 +426,7 @@
 
             <button onclick="signup()">회원가입</button>
 
+            <p class="small">회원가입 시 가상 포인트 10000P가 지급됩니다.</p>
             <p id="signupMessage" class="message"></p>
           </div>
 
@@ -431,7 +449,7 @@
         <div class="app-top">
           <div>
             <h2>대시보드</h2>
-            <p class="small">통계, 일정, HOT, 프로필, 경기 예측, 자유게시판을 관리합니다.</p>
+            <p class="small">통계, 일정, HOT, 포인트 랭킹, 풀 베팅, 자유게시판을 관리합니다.</p>
           </div>
 
           <div>
@@ -439,6 +457,12 @@
             <button class="danger-btn" onclick="logout()">로그아웃</button>
           </div>
         </div>
+      </section>
+
+      <section class="panel">
+        <h2>포인트 랭킹 TOP 10</h2>
+        <div id="rankingTop10" class="ranking-grid"></div>
+        <p id="rankingMessage" class="message"></p>
       </section>
 
       <section class="panel">
@@ -483,6 +507,9 @@
 
         <div id="profileInfo" class="info-grid"></div>
 
+        <h3>내 베팅 내역</h3>
+        <div id="myBets"></div>
+
         <h3>팔로우한 팀</h3>
         <div id="followedTeams" class="follow-grid"></div>
 
@@ -526,6 +553,27 @@
         </div>
 
         <div class="info-grid" id="predictionStats"></div>
+
+        <h3>가상 포인트 풀 베팅</h3>
+        <div id="bettingPanel" class="bet-card">
+          <div id="oddsDisplay" class="odds-grid"></div>
+
+          <div class="controls" style="margin-top: 12px;">
+            <select id="betSelection" onchange="updatePotentialPayout()">
+              <option value="home">홈 승</option>
+              <option value="draw">무승부</option>
+              <option value="away">원정 승</option>
+            </select>
+
+            <input type="number" id="betStake" min="1" value="100" placeholder="베팅 포인트" oninput="updatePotentialPayout()" />
+
+            <button onclick="placeBet()">베팅하기</button>
+            <button class="secondary-btn" onclick="settleCurrentMatch()">정산 시도</button>
+          </div>
+
+          <p id="betExpected" class="small">예상 반환 포인트: -</p>
+          <p id="betMessage" class="message"></p>
+        </div>
 
         <h3>내 예측</h3>
         <div class="controls">
@@ -614,6 +662,7 @@
                 <th>원정팀</th>
                 <th>상태</th>
                 <th>입장</th>
+                <th>베팅</th>
                 <th>좋아요</th>
               </tr>
             </thead>
@@ -675,6 +724,7 @@
     let currentUser = null;
     let currentMatch = null;
     let currentBoardPostId = null;
+    let currentOdds = null;
 
     const itemCache = {};
     const teamCache = {};
@@ -688,6 +738,25 @@
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+    }
+
+    function formatPoint(value) {
+      return `${Number(value || 0).toLocaleString("ko-KR")}P`;
+    }
+
+    function selectionToKorean(selection) {
+      if (selection === "home") return "홈 승";
+      if (selection === "draw") return "무승부";
+      if (selection === "away") return "원정 승";
+      return "-";
+    }
+
+    function betStatusToKorean(status) {
+      if (status === "pending") return "대기중";
+      if (status === "won") return "적중";
+      if (status === "lost") return "미적중";
+      if (status === "void") return "무효";
+      return "-";
     }
 
     function cacheKey(itemType, itemId) {
@@ -759,9 +828,20 @@
 
       userStatus.innerHTML = `
         <strong>${escapeHtml(currentUser.nickname)}</strong>님 로그인 중<br>
+        보유 포인트: <span class="point">${escapeHtml(formatPoint(currentUser.points))}</span><br>
         나이: ${escapeHtml(currentUser.age)}<br>
         이메일: ${escapeHtml(currentUser.email)}
       `;
+    }
+
+    async function refreshCurrentUser() {
+      try {
+        const data = await requestJson("/api/me");
+        currentUser = data.user;
+        updateUserStatus();
+      } catch {
+        currentUser = null;
+      }
     }
 
     async function checkLoginStatus() {
@@ -852,7 +932,9 @@
 
     async function logout() {
       try {
-        await requestJson("/api/logout", { method: "POST" });
+        await requestJson("/api/logout", {
+          method: "POST"
+        });
 
         currentUser = null;
         showAuthView();
@@ -862,7 +944,9 @@
     }
 
     function getCrestImage(src, name) {
-      return src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(name)}">` : "";
+      return src
+        ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(name)}">`
+        : "";
     }
 
     function formatKoreanTime(utcDate) {
@@ -956,6 +1040,32 @@
 
       matchCache[id] = item;
       setItemCache(item);
+    }
+
+    async function loadRanking() {
+      const rankingTop10 = document.getElementById("rankingTop10");
+      const rankingMessage = document.getElementById("rankingMessage");
+
+      rankingMessage.textContent = "랭킹을 불러오는 중...";
+      rankingMessage.className = "message";
+
+      try {
+        const data = await requestJson("/api/ranking");
+
+        rankingTop10.innerHTML = data.ranking.length
+          ? data.ranking.map((user, index) => `
+            <div class="ranking-card">
+              <strong>${index + 1}위 ${escapeHtml(user.nickname)}</strong>
+              <p class="point">${escapeHtml(formatPoint(user.points))}</p>
+            </div>
+          `).join("")
+          : `<p class="small">랭킹 데이터가 없습니다.</p>`;
+
+        rankingMessage.textContent = "포인트 랭킹 TOP 10";
+        rankingMessage.className = "message success-message";
+      } catch (error) {
+        rankingMessage.textContent = error.message;
+      }
     }
 
     async function followCachedItem(itemType, itemId) {
@@ -1193,6 +1303,11 @@
         </div>
 
         <div class="info-box">
+          <span>보유 포인트</span>
+          <strong class="point">${escapeHtml(formatPoint(currentUser.points))}</strong>
+        </div>
+
+        <div class="info-box">
           <span>나이</span>
           <strong>${escapeHtml(currentUser.age)}</strong>
         </div>
@@ -1217,12 +1332,58 @@
           ? data.players.map(renderFollowCard).join("")
           : `<p class="small">팔로우한 선수가 없습니다.</p>`;
 
+        await loadMyBets();
         await renderFollowedTeamMatches(data.teams);
 
         profileMessage.textContent = "프로필이 업데이트되었습니다.";
         profileMessage.className = "message success-message";
       } catch (error) {
         profileMessage.textContent = error.message;
+      }
+    }
+
+    async function loadMyBets() {
+      const container = document.getElementById("myBets");
+
+      try {
+        const data = await requestJson("/api/my-bets");
+
+        container.innerHTML = data.bets.length
+          ? `
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>경기</th>
+                    <th>선택</th>
+                    <th>베팅</th>
+                    <th>예상 배당</th>
+                    <th>예상 반환</th>
+                    <th>실제 지급</th>
+                    <th>상태</th>
+                    <th>시간</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.bets.map(bet => `
+                    <tr>
+                      <td>${escapeHtml((bet.matchMeta.homeTeam || "-") + " vs " + (bet.matchMeta.awayTeam || "-"))}</td>
+                      <td>${escapeHtml(selectionToKorean(bet.selection))}</td>
+                      <td>${escapeHtml(formatPoint(bet.stake))}</td>
+                      <td>${escapeHtml(bet.odds)}</td>
+                      <td>${escapeHtml(formatPoint(bet.potentialPayout))}</td>
+                      <td>${bet.actualPayout === null || bet.actualPayout === undefined ? "-" : escapeHtml(formatPoint(bet.actualPayout))}</td>
+                      <td>${escapeHtml(betStatusToKorean(bet.status))}</td>
+                      <td>${escapeHtml(formatKoreanTime(bet.createdAt))}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+          : `<p class="small">아직 베팅 내역이 없습니다.</p>`;
+      } catch (error) {
+        container.innerHTML = `<p class="message">${escapeHtml(error.message)}</p>`;
       }
     }
 
@@ -1242,9 +1403,7 @@
 
           data.matches.forEach(match => {
             match.competition = match.competition || "-";
-
             saveMatchCache(match);
-
             cards.push(renderMatchCard(match, team.itemName));
           });
         } catch {
@@ -1268,6 +1427,7 @@
 
           <div class="controls" style="margin-top: 10px;">
             <button class="secondary-btn" onclick="openMatchRoom('${match.id}')">경기 창 입장</button>
+            <button onclick="openMatchRoom('${match.id}')">베팅</button>
             ${renderLikeButton(item.itemType, item.itemId)}
           </div>
         </div>
@@ -1294,6 +1454,8 @@
 
       setItemCache(cached);
       currentMatch = cached;
+
+      await loadOdds(matchId);
 
       const data = await requestJson(`/api/match-room/${matchId}`);
       const meta = cached.itemMeta || {};
@@ -1344,9 +1506,203 @@
       renderComments("match", matchId, data.comments, "matchCommentsList");
     }
 
-    async function likeMatchRoom() {
+    async function loadOdds(matchId) {
+      const meta = currentMatch?.itemMeta || {};
+      const selection = document.getElementById("betSelection").value;
+      const stake = document.getElementById("betStake").value || 0;
+
+      const query = new URLSearchParams({
+        homeTeam: meta.homeTeam || "",
+        awayTeam: meta.awayTeam || "",
+        utcDate: meta.utcDate || "",
+        status: meta.status || "",
+        competition: meta.competition || "",
+        homeCrest: meta.homeCrest || "",
+        awayCrest: meta.awayCrest || "",
+        selection,
+        stake
+      });
+
+      const data = await requestJson(`/api/odds/${matchId}?${query.toString()}`);
+      currentOdds = data.projectedPool;
+
+      renderPoolDisplay(data);
+      updatePotentialPayout(false);
+    }
+
+    function renderPoolDisplay(data) {
+      document.getElementById("oddsDisplay").innerHTML = `
+        <div class="odds-card">
+          <span>홈 승 풀</span>
+          <strong>${escapeHtml(formatPoint(data.currentPool.pools.home))}</strong>
+          <p class="small">현재 예상 배당: ${data.currentPool.odds.home || "-"}</p>
+        </div>
+
+        <div class="odds-card">
+          <span>무승부 풀</span>
+          <strong>${escapeHtml(formatPoint(data.currentPool.pools.draw))}</strong>
+          <p class="small">현재 예상 배당: ${data.currentPool.odds.draw || "-"}</p>
+        </div>
+
+        <div class="odds-card">
+          <span>원정 승 풀</span>
+          <strong>${escapeHtml(formatPoint(data.currentPool.pools.away))}</strong>
+          <p class="small">현재 예상 배당: ${data.currentPool.odds.away || "-"}</p>
+        </div>
+
+        <div class="odds-card">
+          <span>전체 베팅 풀</span>
+          <strong>${escapeHtml(formatPoint(data.currentPool.totalPool))}</strong>
+          <p class="small">내 베팅 전 기준</p>
+        </div>
+      `;
+    }
+
+    async function updatePotentialPayout(fetchLatest = true) {
       if (!currentMatch) return;
 
+      const stake = Number(document.getElementById("betStake").value);
+      const selection = document.getElementById("betSelection").value;
+
+      if (!Number.isInteger(stake) || stake <= 0) {
+        document.getElementById("betExpected").textContent = "예상 반환 포인트: -";
+        return;
+      }
+
+      if (!fetchLatest && currentOdds) {
+        const projectedOdds = Number(currentOdds.odds[selection] || 0);
+        const expected = Math.floor(stake * projectedOdds);
+
+        document.getElementById("betExpected").textContent =
+          projectedOdds > 0
+            ? `예상 반환 포인트: ${formatPoint(expected)} · 예상 배당: ${projectedOdds}`
+            : "예상 반환 포인트: -";
+
+        return;
+      }
+
+      const meta = currentMatch?.itemMeta || {};
+
+      const query = new URLSearchParams({
+        homeTeam: meta.homeTeam || "",
+        awayTeam: meta.awayTeam || "",
+        utcDate: meta.utcDate || "",
+        status: meta.status || "",
+        competition: meta.competition || "",
+        selection,
+        stake
+      });
+
+      try {
+        const data = await requestJson(`/api/odds/${currentMatch.itemId}?${query.toString()}`);
+
+        currentOdds = data.projectedPool;
+
+        const projectedOdds = Number(data.projectedPool.odds[selection] || 0);
+        const expected = Math.floor(stake * projectedOdds);
+
+        document.getElementById("betExpected").textContent =
+          projectedOdds > 0
+            ? `예상 반환 포인트: ${formatPoint(expected)} · 예상 배당: ${projectedOdds}`
+            : "예상 반환 포인트: -";
+
+        document.getElementById("oddsDisplay").innerHTML = `
+          <div class="odds-card">
+            <span>홈 승 풀</span>
+            <strong>${escapeHtml(formatPoint(data.currentPool.pools.home))}</strong>
+            <p class="small">현재 예상 배당: ${data.currentPool.odds.home || "-"}</p>
+          </div>
+
+          <div class="odds-card">
+            <span>무승부 풀</span>
+            <strong>${escapeHtml(formatPoint(data.currentPool.pools.draw))}</strong>
+            <p class="small">현재 예상 배당: ${data.currentPool.odds.draw || "-"}</p>
+          </div>
+
+          <div class="odds-card">
+            <span>원정 승 풀</span>
+            <strong>${escapeHtml(formatPoint(data.currentPool.pools.away))}</strong>
+            <p class="small">현재 예상 배당: ${data.currentPool.odds.away || "-"}</p>
+          </div>
+
+          <div class="odds-card">
+            <span>내 베팅 반영 전체 풀</span>
+            <strong>${escapeHtml(formatPoint(data.projectedPool.totalPool))}</strong>
+            <p class="small">예상 배당은 내 베팅 포함 기준</p>
+          </div>
+        `;
+      } catch {
+        document.getElementById("betExpected").textContent = "예상 반환 포인트 계산 실패";
+      }
+    }
+
+    async function placeBet() {
+      if (!currentMatch) return;
+
+      const betMessage = document.getElementById("betMessage");
+
+      betMessage.textContent = "베팅 처리 중...";
+      betMessage.className = "message";
+
+      try {
+        const data = await requestJson("/api/bets", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            matchId: currentMatch.itemId,
+            selection: document.getElementById("betSelection").value,
+            stake: document.getElementById("betStake").value,
+            matchMeta: currentMatch.itemMeta
+          })
+        });
+
+        currentUser = data.user;
+        updateUserStatus();
+
+        betMessage.textContent = "베팅이 완료되었습니다.";
+        betMessage.className = "message success-message";
+
+        await loadMyBets();
+        await loadRanking();
+        await loadProfile();
+        await loadOdds(currentMatch.itemId);
+      } catch (error) {
+        betMessage.textContent = error.message;
+      }
+    }
+
+    async function settleCurrentMatch() {
+      if (!currentMatch) return;
+
+      const betMessage = document.getElementById("betMessage");
+
+      betMessage.textContent = "정산 처리 중...";
+      betMessage.className = "message";
+
+      try {
+        const data = await requestJson(`/api/bets/settle/${currentMatch.itemId}`, {
+          method: "POST"
+        });
+
+        currentUser = data.user;
+        updateUserStatus();
+
+        betMessage.textContent = `정산 완료: 적중 ${data.wonCount}건, 미적중 ${data.lostCount}건`;
+        betMessage.className = "message success-message";
+
+        await loadMyBets();
+        await loadRanking();
+        await loadProfile();
+        await loadOdds(currentMatch.itemId);
+      } catch (error) {
+        betMessage.textContent = error.message;
+      }
+    }
+
+    async function likeMatchRoom() {
+      if (!currentMatch) return;
       await toggleLike(currentMatch.itemType, currentMatch.itemId);
     }
 
@@ -1368,9 +1724,7 @@
           away = temp;
         }
 
-        if (home === away) {
-          home = away + 1;
-        }
+        if (home === away) home = away + 1;
       }
 
       if (result === "away") {
@@ -1380,9 +1734,7 @@
           away = temp;
         }
 
-        if (home === away) {
-          away = home + 1;
-        }
+        if (home === away) away = home + 1;
       }
 
       if (result === "draw") {
@@ -1913,7 +2265,12 @@
       matchMessage.className = "message";
 
       try {
-        const query = new URLSearchParams({ dateFrom, dateTo, status });
+        const query = new URLSearchParams({
+          dateFrom,
+          dateTo,
+          status
+        });
+
         const data = await requestJson(`/api/matches/${competition}?${query.toString()}`);
 
         matchTitle.textContent = `${data.competition} 경기 일정`;
@@ -1956,6 +2313,10 @@
 
             <td>
               <button class="secondary-btn" onclick="openMatchRoom('${match.id}')">입장</button>
+            </td>
+
+            <td>
+              <button onclick="openMatchRoom('${match.id}')">베팅</button>
             </td>
 
             <td>${renderLikeButton(item.itemType, item.itemId)}</td>
@@ -2017,7 +2378,6 @@
 
         const matchRows = scheduledMatches.matches.map(match => {
           match.competition = match.competition || "-";
-
           saveMatchCache(match);
 
           const item = getItemCache("match", match.id);
@@ -2033,6 +2393,10 @@
 
               <td>
                 <button class="secondary-btn" onclick="openMatchRoom('${match.id}')">입장</button>
+              </td>
+
+              <td>
+                <button onclick="openMatchRoom('${match.id}')">베팅</button>
               </td>
 
               <td>${renderLikeButton(item.itemType, item.itemId)}</td>
@@ -2088,12 +2452,13 @@
                     <th>원정팀</th>
                     <th>상태</th>
                     <th>입장</th>
+                    <th>베팅</th>
                     <th>좋아요</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  ${matchRows || `<tr><td colspan="8">예정 경기가 없습니다.</td></tr>`}
+                  ${matchRows || `<tr><td colspan="9">예정 경기가 없습니다.</td></tr>`}
                 </tbody>
               </table>
             </div>
@@ -2311,6 +2676,8 @@
     }
 
     async function loadAll() {
+      await refreshCurrentUser();
+      await loadRanking();
       await loadHot();
       await loadHotBoardPosts();
       await loadProfile();

@@ -55,6 +55,15 @@ const db = new Database(DB_FILE);
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
+function ensureColumn(tableName, columnName, columnDefinition) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  const exists = columns.some(column => column.name === columnName);
+
+  if (!exists) {
+    db.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`).run();
+  }
+}
+
 db.prepare(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,8 +71,17 @@ db.prepare(`
     age INTEGER NOT NULL,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    points INTEGER NOT NULL DEFAULT 10000,
     created_at TEXT NOT NULL
   )
+`).run();
+
+ensureColumn("users", "points", "INTEGER NOT NULL DEFAULT 10000");
+
+db.prepare(`
+  UPDATE users
+  SET points = 10000
+  WHERE points IS NULL
 `).run();
 
 db.prepare(`
@@ -194,6 +212,26 @@ db.prepare(`
   )
 `).run();
 
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS bets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    match_id TEXT NOT NULL,
+    selection TEXT NOT NULL CHECK(selection IN ('home', 'draw', 'away')),
+    stake INTEGER NOT NULL,
+    odds REAL NOT NULL,
+    potential_payout INTEGER NOT NULL,
+    actual_payout INTEGER,
+    status TEXT NOT NULL CHECK(status IN ('pending', 'won', 'lost', 'void')),
+    match_meta TEXT,
+    created_at TEXT NOT NULL,
+    settled_at TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`).run();
+
+ensureColumn("bets", "actual_payout", "INTEGER");
+
 function formatDate(date) {
   return date.toISOString().split("T")[0];
 }
@@ -209,6 +247,7 @@ function getKoreaIsoWeekKey(date = new Date()) {
   ));
 
   const day = d.getUTCDay() || 7;
+
   d.setUTCDate(d.getUTCDate() + 4 - day);
 
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -239,6 +278,7 @@ function sanitizeUser(user) {
     nickname: user.nickname,
     age: user.age,
     email: user.email,
+    points: user.points,
     createdAt: user.created_at
   };
 }
@@ -255,7 +295,9 @@ function createToken(user) {
       nickname: user.nickname
     },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    {
+      expiresIn: JWT_EXPIRES_IN
+    }
   );
 }
 
@@ -281,40 +323,54 @@ function requireAuth(req, res, next) {
     const token = req.cookies.auth_token;
 
     if (!token) {
-      return res.status(401).json({ error: "로그인이 필요합니다." });
+      return res.status(401).json({
+        error: "로그인이 필요합니다."
+      });
     }
 
     if (!JWT_SECRET) {
-      return res.status(500).json({ error: ".env 파일에 JWT_SECRET이 없습니다." });
+      return res.status(500).json({
+        error: ".env 파일에 JWT_SECRET이 없습니다."
+      });
     }
 
     const payload = jwt.verify(token, JWT_SECRET);
 
     const user = db
-      .prepare("SELECT id, nickname, age, email, created_at FROM users WHERE id = ?")
+      .prepare("SELECT id, nickname, age, email, points, created_at FROM users WHERE id = ?")
       .get(payload.id);
 
     if (!user) {
       clearAuthCookie(res);
-      return res.status(401).json({ error: "유효하지 않은 사용자입니다." });
+
+      return res.status(401).json({
+        error: "유효하지 않은 사용자입니다."
+      });
     }
 
     req.user = user;
     next();
   } catch {
     clearAuthCookie(res);
-    return res.status(401).json({ error: "로그인이 만료되었거나 유효하지 않습니다." });
+
+    return res.status(401).json({
+      error: "로그인이 만료되었거나 유효하지 않습니다."
+    });
   }
 }
 
 function checkCompetition(competition, res) {
   if (!allowedCompetitions.includes(competition)) {
-    res.status(400).json({ error: "지원하지 않는 리그 코드입니다." });
+    res.status(400).json({
+      error: "지원하지 않는 리그 코드입니다."
+    });
     return true;
   }
 
   if (!API_KEY) {
-    res.status(500).json({ error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다." });
+    res.status(500).json({
+      error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다."
+    });
     return true;
   }
 
@@ -323,7 +379,9 @@ function checkCompetition(competition, res) {
 
 function checkApiKey(res) {
   if (!API_KEY) {
-    res.status(500).json({ error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다." });
+    res.status(500).json({
+      error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다."
+    });
     return true;
   }
 
@@ -332,7 +390,9 @@ function checkApiKey(res) {
 
 async function footballDataRequest(url) {
   const response = await fetch(url, {
-    headers: { "X-Auth-Token": API_KEY }
+    headers: {
+      "X-Auth-Token": API_KEY
+    }
   });
 
   const text = await response.text();
@@ -354,6 +414,82 @@ async function footballDataRequest(url) {
   }
 
   return data;
+}
+
+async function getMatchFromApi(matchId) {
+  if (!API_KEY) return null;
+
+  try {
+    return await footballDataRequest(`https://api.football-data.org/v4/matches/${matchId}`);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeMatchMetaFromApi(match) {
+  if (!match) return null;
+
+  return {
+    utcDate: match.utcDate,
+    status: match.status,
+    competition: match.competition?.name,
+    homeTeam: match.homeTeam?.name,
+    awayTeam: match.awayTeam?.name,
+    homeCrest: match.homeTeam?.crest,
+    awayCrest: match.awayTeam?.crest
+  };
+}
+
+function getMatchResultFromScore(homeScore, awayScore) {
+  if (homeScore > awayScore) return "home";
+  if (homeScore < awayScore) return "away";
+  return "draw";
+}
+
+function getBetPools(matchId, extraSelection = null, extraStake = 0) {
+  const rows = db.prepare(`
+    SELECT selection, SUM(stake) AS total
+    FROM bets
+    WHERE match_id = ?
+      AND status = 'pending'
+    GROUP BY selection
+  `).all(String(matchId));
+
+  const pools = {
+    home: 0,
+    draw: 0,
+    away: 0
+  };
+
+  rows.forEach(row => {
+    pools[row.selection] = row.total || 0;
+  });
+
+  if (extraSelection && ["home", "draw", "away"].includes(extraSelection)) {
+    pools[extraSelection] += Number(extraStake || 0);
+  }
+
+  const totalPool = pools.home + pools.draw + pools.away;
+
+  function calcOdds(selection) {
+    if (pools[selection] <= 0 || totalPool <= 0) return null;
+    return Number((totalPool / pools[selection]).toFixed(2));
+  }
+
+  return {
+    totalPool,
+    pools,
+    odds: {
+      home: calcOdds("home"),
+      draw: calcOdds("draw"),
+      away: calcOdds("away")
+    }
+  };
+}
+
+function calcParimutuelPayout(stake, winningPool, totalPool) {
+  if (winningPool <= 0 || totalPool <= 0) return 0;
+  return Math.floor((stake / winningPool) * totalPool);
 }
 
 function likeInfo(userId, itemType, itemId) {
@@ -548,49 +684,62 @@ app.post("/api/signup", async (req, res) => {
     const plainPassword = String(password);
 
     if (trimmedNickname.length < 2) {
-      return res.status(400).json({ error: "닉네임은 2글자 이상이어야 합니다." });
+      return res.status(400).json({
+        error: "닉네임은 2글자 이상이어야 합니다."
+      });
     }
 
     if (!Number.isInteger(parsedAge) || parsedAge < 1 || parsedAge > 120) {
-      return res.status(400).json({ error: "나이는 1부터 120 사이의 숫자여야 합니다." });
+      return res.status(400).json({
+        error: "나이는 1부터 120 사이의 숫자여야 합니다."
+      });
     }
 
     if (!isValidEmail(normalizedEmail)) {
-      return res.status(400).json({ error: "올바른 이메일 형식이 아닙니다." });
+      return res.status(400).json({
+        error: "올바른 이메일 형식이 아닙니다."
+      });
     }
 
     if (plainPassword.length < 8) {
-      return res.status(400).json({ error: "비밀번호는 8자 이상이어야 합니다." });
+      return res.status(400).json({
+        error: "비밀번호는 8자 이상이어야 합니다."
+      });
     }
 
-    const exists = db.prepare("SELECT id FROM users WHERE email = ?").get(normalizedEmail);
+    const exists = db
+      .prepare("SELECT id FROM users WHERE email = ?")
+      .get(normalizedEmail);
 
     if (exists) {
-      return res.status(409).json({ error: "이미 가입된 이메일입니다." });
+      return res.status(409).json({
+        error: "이미 가입된 이메일입니다."
+      });
     }
 
     const passwordHash = await bcrypt.hash(plainPassword, 12);
 
     const result = db.prepare(`
-      INSERT INTO users (nickname, age, email, password_hash, created_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO users (nickname, age, email, password_hash, points, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       trimmedNickname,
       parsedAge,
       normalizedEmail,
       passwordHash,
+      10000,
       new Date().toISOString()
     );
 
     const user = db
-      .prepare("SELECT id, nickname, age, email, created_at FROM users WHERE id = ?")
+      .prepare("SELECT id, nickname, age, email, points, created_at FROM users WHERE id = ?")
       .get(result.lastInsertRowid);
 
     const token = createToken(user);
     setAuthCookie(res, token);
 
     res.status(201).json({
-      message: "회원가입이 완료되었습니다.",
+      message: "회원가입이 완료되었습니다. 10000 포인트가 지급되었습니다.",
       user: sanitizeUser(user)
     });
   } catch (error) {
@@ -606,21 +755,29 @@ app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: "이메일과 비밀번호를 모두 입력해야 합니다." });
+      return res.status(400).json({
+        error: "이메일과 비밀번호를 모두 입력해야 합니다."
+      });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
 
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(normalizedEmail);
+    const user = db
+      .prepare("SELECT * FROM users WHERE email = ?")
+      .get(normalizedEmail);
 
     if (!user) {
-      return res.status(401).json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." });
+      return res.status(401).json({
+        error: "이메일 또는 비밀번호가 올바르지 않습니다."
+      });
     }
 
     const ok = await bcrypt.compare(String(password), user.password_hash);
 
     if (!ok) {
-      return res.status(401).json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." });
+      return res.status(401).json({
+        error: "이메일 또는 비밀번호가 올바르지 않습니다."
+      });
     }
 
     const token = createToken(user);
@@ -639,12 +796,367 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.get("/api/me", requireAuth, (req, res) => {
-  res.json({ user: sanitizeUser(req.user) });
+  res.json({
+    user: sanitizeUser(req.user)
+  });
 });
 
 app.post("/api/logout", (req, res) => {
   clearAuthCookie(res);
-  res.json({ message: "로그아웃되었습니다." });
+
+  res.json({
+    message: "로그아웃되었습니다."
+  });
+});
+
+/* =========================
+   Ranking / Point API
+========================= */
+
+app.get("/api/ranking", requireAuth, (req, res) => {
+  try {
+    const ranking = db.prepare(`
+      SELECT id, nickname, points
+      FROM users
+      ORDER BY points DESC, id ASC
+      LIMIT 10
+    `).all();
+
+    res.json({
+      ranking
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "랭킹을 불러오지 못했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+/* =========================
+   Betting API - Parimutuel Pool
+========================= */
+
+app.get("/api/odds/:matchId", requireAuth, async (req, res) => {
+  try {
+    const matchId = String(req.params.matchId);
+
+    const selection = req.query.selection || null;
+    const stake = Number(req.query.stake || 0);
+
+    const apiMatch = await getMatchFromApi(matchId);
+    const apiMeta = normalizeMatchMetaFromApi(apiMatch);
+
+    const queryMeta = {
+      homeTeam: req.query.homeTeam || undefined,
+      awayTeam: req.query.awayTeam || undefined,
+      utcDate: req.query.utcDate || undefined,
+      status: req.query.status || undefined,
+      competition: req.query.competition || undefined,
+      homeCrest: req.query.homeCrest || undefined,
+      awayCrest: req.query.awayCrest || undefined
+    };
+
+    const matchMeta = apiMeta || queryMeta;
+
+    const currentPool = getBetPools(matchId);
+    const projectedPool = getBetPools(
+      matchId,
+      ["home", "draw", "away"].includes(selection) ? selection : null,
+      Number.isInteger(stake) && stake > 0 ? stake : 0
+    );
+
+    res.json({
+      matchId,
+      matchMeta,
+      currentPool,
+      projectedPool
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "베팅 풀 정보를 불러오지 못했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.post("/api/bets", requireAuth, async (req, res) => {
+  try {
+    const { matchId, selection, stake, matchMeta } = req.body;
+
+    if (!matchId || !selection || !stake) {
+      return res.status(400).json({
+        error: "경기, 선택, 베팅 포인트를 모두 입력해야 합니다."
+      });
+    }
+
+    if (!["home", "draw", "away"].includes(selection)) {
+      return res.status(400).json({
+        error: "베팅 선택값이 올바르지 않습니다."
+      });
+    }
+
+    const parsedStake = Number(stake);
+
+    if (!Number.isInteger(parsedStake) || parsedStake < 1) {
+      return res.status(400).json({
+        error: "베팅 포인트는 1 이상의 정수여야 합니다."
+      });
+    }
+
+    const apiMatch = await getMatchFromApi(matchId);
+    const apiMeta = normalizeMatchMetaFromApi(apiMatch);
+    const finalMeta = apiMeta || matchMeta || {};
+
+    const status = apiMatch?.status || finalMeta.status;
+
+    if (["FINISHED", "IN_PLAY", "PAUSED", "LIVE"].includes(status)) {
+      return res.status(400).json({
+        error: "이미 시작했거나 종료된 경기에는 베팅할 수 없습니다."
+      });
+    }
+
+    const projectedPool = getBetPools(matchId, selection, parsedStake);
+    const projectedOdds = projectedPool.odds[selection] || 1;
+    const projectedPayout = Math.floor(parsedStake * projectedOdds);
+
+    const transaction = db.transaction(() => {
+      const user = db
+        .prepare("SELECT id, points FROM users WHERE id = ?")
+        .get(req.user.id);
+
+      if (!user) {
+        const error = new Error("사용자를 찾을 수 없습니다.");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (user.points < parsedStake) {
+        const error = new Error("보유 포인트가 부족합니다.");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      db.prepare(`
+        UPDATE users
+        SET points = points - ?
+        WHERE id = ?
+      `).run(parsedStake, req.user.id);
+
+      const result = db.prepare(`
+        INSERT INTO bets (
+          user_id,
+          match_id,
+          selection,
+          stake,
+          odds,
+          potential_payout,
+          status,
+          match_meta,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        req.user.id,
+        String(matchId),
+        selection,
+        parsedStake,
+        projectedOdds,
+        projectedPayout,
+        "pending",
+        JSON.stringify(finalMeta || {}),
+        new Date().toISOString()
+      );
+
+      return result.lastInsertRowid;
+    });
+
+    const betId = transaction();
+
+    const user = db
+      .prepare("SELECT id, nickname, age, email, points, created_at FROM users WHERE id = ?")
+      .get(req.user.id);
+
+    res.status(201).json({
+      message: "베팅이 완료되었습니다.",
+      betId,
+      projectedOdds,
+      projectedPayout,
+      pool: getBetPools(matchId),
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.message || "베팅 처리 중 오류가 발생했습니다.",
+      detail: error.statusCode ? undefined : error.message
+    });
+  }
+});
+
+app.get("/api/my-bets", requireAuth, (req, res) => {
+  try {
+    const bets = db.prepare(`
+      SELECT
+        id,
+        match_id,
+        selection,
+        stake,
+        odds,
+        potential_payout,
+        actual_payout,
+        status,
+        match_meta,
+        created_at,
+        settled_at
+      FROM bets
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 100
+    `).all(req.user.id).map(row => ({
+      id: row.id,
+      matchId: row.match_id,
+      selection: row.selection,
+      stake: row.stake,
+      odds: row.odds,
+      potentialPayout: row.potential_payout,
+      actualPayout: row.actual_payout,
+      status: row.status,
+      matchMeta: safeJsonParse(row.match_meta),
+      createdAt: row.created_at,
+      settledAt: row.settled_at
+    }));
+
+    res.json({
+      bets
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "내 베팅 내역을 불러오지 못했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.post("/api/bets/settle/:matchId", requireAuth, async (req, res) => {
+  try {
+    if (checkApiKey(res)) return;
+
+    const matchId = String(req.params.matchId);
+    const match = await getMatchFromApi(matchId);
+
+    if (!match) {
+      return res.status(404).json({
+        error: "경기 정보를 찾을 수 없습니다."
+      });
+    }
+
+    if (match.status !== "FINISHED") {
+      return res.status(400).json({
+        error: "아직 종료되지 않은 경기입니다."
+      });
+    }
+
+    const homeScore = match.score?.fullTime?.home;
+    const awayScore = match.score?.fullTime?.away;
+
+    if (
+      homeScore === null ||
+      homeScore === undefined ||
+      awayScore === null ||
+      awayScore === undefined
+    ) {
+      return res.status(400).json({
+        error: "정산 가능한 스코어 정보가 없습니다."
+      });
+    }
+
+    const resultSelection = getMatchResultFromScore(homeScore, awayScore);
+    const now = new Date().toISOString();
+
+    const settleTransaction = db.transaction(() => {
+      const pendingBets = db.prepare(`
+        SELECT id, user_id, selection, stake
+        FROM bets
+        WHERE match_id = ? AND status = 'pending'
+      `).all(matchId);
+
+      const totalPool = pendingBets.reduce((sum, bet) => sum + bet.stake, 0);
+
+      const winningPool = pendingBets
+        .filter(bet => bet.selection === resultSelection)
+        .reduce((sum, bet) => sum + bet.stake, 0);
+
+      let wonCount = 0;
+      let lostCount = 0;
+      let payoutTotal = 0;
+
+      pendingBets.forEach(bet => {
+        if (bet.selection === resultSelection && winningPool > 0) {
+          const payout = calcParimutuelPayout(
+            bet.stake,
+            winningPool,
+            totalPool
+          );
+
+          db.prepare(`
+            UPDATE users
+            SET points = points + ?
+            WHERE id = ?
+          `).run(payout, bet.user_id);
+
+          db.prepare(`
+            UPDATE bets
+            SET status = 'won',
+                actual_payout = ?,
+                settled_at = ?
+            WHERE id = ?
+          `).run(payout, now, bet.id);
+
+          wonCount++;
+          payoutTotal += payout;
+        } else {
+          db.prepare(`
+            UPDATE bets
+            SET status = 'lost',
+                actual_payout = 0,
+                settled_at = ?
+            WHERE id = ?
+          `).run(now, bet.id);
+
+          lostCount++;
+        }
+      });
+
+      return {
+        settledCount: pendingBets.length,
+        totalPool,
+        winningPool,
+        wonCount,
+        lostCount,
+        payoutTotal
+      };
+    });
+
+    const result = settleTransaction();
+
+    const user = db
+      .prepare("SELECT id, nickname, age, email, points, created_at FROM users WHERE id = ?")
+      .get(req.user.id);
+
+    res.json({
+      message: "정산이 완료되었습니다.",
+      matchResult: resultSelection,
+      homeScore,
+      awayScore,
+      ...result,
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "정산 처리 중 오류가 발생했습니다.",
+      detail: error.message
+    });
+  }
 });
 
 /* =========================
@@ -686,11 +1198,15 @@ app.post("/api/follows", requireAuth, (req, res) => {
     const { itemType, itemId, itemName, itemMeta } = req.body;
 
     if (!itemType || !itemId || !itemName) {
-      return res.status(400).json({ error: "팔로우 대상 정보가 부족합니다." });
+      return res.status(400).json({
+        error: "팔로우 대상 정보가 부족합니다."
+      });
     }
 
     if (!["team", "player"].includes(itemType)) {
-      return res.status(400).json({ error: "팔로우 타입은 team 또는 player만 가능합니다." });
+      return res.status(400).json({
+        error: "팔로우 타입은 team 또는 player만 가능합니다."
+      });
     }
 
     db.prepare(`
@@ -709,7 +1225,9 @@ app.post("/api/follows", requireAuth, (req, res) => {
       new Date().toISOString()
     );
 
-    res.status(201).json({ message: "팔로우가 완료되었습니다." });
+    res.status(201).json({
+      message: "팔로우가 완료되었습니다."
+    });
   } catch (error) {
     res.status(500).json({
       error: "팔로우 처리 중 오류가 발생했습니다.",
@@ -723,7 +1241,9 @@ app.delete("/api/follows/:itemType/:itemId", requireAuth, (req, res) => {
     const { itemType, itemId } = req.params;
 
     if (!["team", "player"].includes(itemType)) {
-      return res.status(400).json({ error: "팔로우 타입은 team 또는 player만 가능합니다." });
+      return res.status(400).json({
+        error: "팔로우 타입은 team 또는 player만 가능합니다."
+      });
     }
 
     db.prepare(`
@@ -731,7 +1251,9 @@ app.delete("/api/follows/:itemType/:itemId", requireAuth, (req, res) => {
       WHERE user_id = ? AND item_type = ? AND item_id = ?
     `).run(req.user.id, itemType, String(itemId));
 
-    res.json({ message: "팔로우가 해제되었습니다." });
+    res.json({
+      message: "팔로우가 해제되었습니다."
+    });
   } catch (error) {
     res.status(500).json({
       error: "팔로우 해제 중 오류가 발생했습니다.",
@@ -741,7 +1263,7 @@ app.delete("/api/follows/:itemType/:itemId", requireAuth, (req, res) => {
 });
 
 /* =========================
-   Weekly Like API
+   Like API
 ========================= */
 
 app.get("/api/likes/:itemType/:itemId", requireAuth, (req, res) => {
@@ -749,7 +1271,9 @@ app.get("/api/likes/:itemType/:itemId", requireAuth, (req, res) => {
     const { itemType, itemId } = req.params;
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({ error: "좋아요 타입이 올바르지 않습니다." });
+      return res.status(400).json({
+        error: "좋아요 타입이 올바르지 않습니다."
+      });
     }
 
     res.json(likeInfo(req.user.id, itemType, itemId));
@@ -766,11 +1290,15 @@ app.post("/api/likes", requireAuth, (req, res) => {
     const { itemType, itemId, itemName, itemMeta } = req.body;
 
     if (!itemType || !itemId || !itemName) {
-      return res.status(400).json({ error: "좋아요 대상 정보가 부족합니다." });
+      return res.status(400).json({
+        error: "좋아요 대상 정보가 부족합니다."
+      });
     }
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({ error: "좋아요 타입이 올바르지 않습니다." });
+      return res.status(400).json({
+        error: "좋아요 타입이 올바르지 않습니다."
+      });
     }
 
     const weekKey = getKoreaIsoWeekKey();
@@ -809,7 +1337,9 @@ app.delete("/api/likes/:itemType/:itemId", requireAuth, (req, res) => {
     const { itemType, itemId } = req.params;
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({ error: "좋아요 타입이 올바르지 않습니다." });
+      return res.status(400).json({
+        error: "좋아요 타입이 올바르지 않습니다."
+      });
     }
 
     const weekKey = getKoreaIsoWeekKey();
@@ -875,7 +1405,9 @@ app.get("/api/comments/:itemType/:itemId", requireAuth, (req, res) => {
     const { itemType, itemId } = req.params;
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({ error: "댓글 타입이 올바르지 않습니다." });
+      return res.status(400).json({
+        error: "댓글 타입이 올바르지 않습니다."
+      });
     }
 
     res.json({
@@ -895,21 +1427,29 @@ app.post("/api/comments", requireAuth, (req, res) => {
     const { itemType, itemId, itemName, itemMeta, parentCommentId, body } = req.body;
 
     if (!itemType || !itemId || !itemName || !body) {
-      return res.status(400).json({ error: "댓글 대상 정보와 댓글 내용을 모두 입력해야 합니다." });
+      return res.status(400).json({
+        error: "댓글 대상 정보와 댓글 내용을 모두 입력해야 합니다."
+      });
     }
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({ error: "댓글 타입이 올바르지 않습니다." });
+      return res.status(400).json({
+        error: "댓글 타입이 올바르지 않습니다."
+      });
     }
 
     const commentBody = String(body).trim();
 
     if (commentBody.length < 1) {
-      return res.status(400).json({ error: "댓글 내용을 입력해야 합니다." });
+      return res.status(400).json({
+        error: "댓글 내용을 입력해야 합니다."
+      });
     }
 
     if (commentBody.length > 500) {
-      return res.status(400).json({ error: "댓글은 500자 이하로 입력해야 합니다." });
+      return res.status(400).json({
+        error: "댓글은 500자 이하로 입력해야 합니다."
+      });
     }
 
     const weekKey = getKoreaIsoWeekKey();
@@ -926,7 +1466,9 @@ app.post("/api/comments", requireAuth, (req, res) => {
       `).get(Number(parentCommentId), itemType, String(itemId), weekKey);
 
       if (!parent) {
-        return res.status(400).json({ error: "대댓글을 달 원댓글을 찾을 수 없습니다." });
+        return res.status(400).json({
+          error: "대댓글을 달 원댓글을 찾을 수 없습니다."
+        });
       }
 
       normalizedParentId = Number(parentCommentId);
@@ -984,10 +1526,16 @@ app.post("/api/comment-likes/:commentId", requireAuth, (req, res) => {
   try {
     const commentId = Number(req.params.commentId);
 
-    const comment = db.prepare("SELECT id FROM comments WHERE id = ?").get(commentId);
+    const comment = db.prepare(`
+      SELECT id
+      FROM comments
+      WHERE id = ?
+    `).get(commentId);
 
     if (!comment) {
-      return res.status(404).json({ error: "댓글을 찾을 수 없습니다." });
+      return res.status(404).json({
+        error: "댓글을 찾을 수 없습니다."
+      });
     }
 
     const weekKey = getKoreaIsoWeekKey();
@@ -997,7 +1545,12 @@ app.post("/api/comment-likes/:commentId", requireAuth, (req, res) => {
       VALUES (?, ?, ?, ?)
       ON CONFLICT(user_id, comment_id, week_key)
       DO NOTHING
-    `).run(req.user.id, commentId, weekKey, new Date().toISOString());
+    `).run(
+      req.user.id,
+      commentId,
+      weekKey,
+      new Date().toISOString()
+    );
 
     res.status(201).json({
       message: "댓글 좋아요가 반영되었습니다.",
@@ -1048,7 +1601,11 @@ app.get("/api/match-room/:matchId", requireAuth, (req, res) => {
       GROUP BY prediction_result
     `).all(matchId);
 
-    const stats = { home: 0, draw: 0, away: 0 };
+    const stats = {
+      home: 0,
+      draw: 0,
+      away: 0
+    };
 
     statsRows.forEach(row => {
       stats[row.result] = row.count;
@@ -1075,6 +1632,7 @@ app.get("/api/match-room/:matchId", requireAuth, (req, res) => {
         awayAvg: averageScore.awayAvg === null ? null : Number(averageScore.awayAvg).toFixed(1)
       },
       myPrediction,
+      pool: getBetPools(matchId),
       comments: getCommentsForItem(req.user.id, "match", matchId),
       like: likeInfo(req.user.id, "match", matchId)
     });
@@ -1095,7 +1653,9 @@ app.post("/api/match-room/:matchId/prediction", requireAuth, (req, res) => {
     const parsedAway = Number(awayScore);
 
     if (!["home", "draw", "away"].includes(predictionResult)) {
-      return res.status(400).json({ error: "승/무/패 예측값이 올바르지 않습니다." });
+      return res.status(400).json({
+        error: "승/무/패 예측값이 올바르지 않습니다."
+      });
     }
 
     if (
@@ -1106,13 +1666,21 @@ app.post("/api/match-room/:matchId/prediction", requireAuth, (req, res) => {
       parsedHome > 30 ||
       parsedAway > 30
     ) {
-      return res.status(400).json({ error: "스코어는 0부터 30 사이의 정수여야 합니다." });
+      return res.status(400).json({
+        error: "스코어는 0부터 30 사이의 정수여야 합니다."
+      });
     }
 
-    const validationError = validatePredictionAndScore(predictionResult, parsedHome, parsedAway);
+    const validationError = validatePredictionAndScore(
+      predictionResult,
+      parsedHome,
+      parsedAway
+    );
 
     if (validationError) {
-      return res.status(400).json({ error: validationError });
+      return res.status(400).json({
+        error: validationError
+      });
     }
 
     const now = new Date().toISOString();
@@ -1147,7 +1715,9 @@ app.post("/api/match-room/:matchId/prediction", requireAuth, (req, res) => {
       now
     );
 
-    res.json({ message: "예측이 저장되었습니다." });
+    res.json({
+      message: "예측이 저장되었습니다."
+    });
   } catch (error) {
     res.status(500).json({
       error: "예측 저장 중 오류가 발생했습니다.",
@@ -1188,7 +1758,9 @@ app.get("/api/board/posts", requireAuth, (req, res) => {
       like: boardPostLikeInfo(req.user.id, post.id)
     }));
 
-    res.json({ posts });
+    res.json({
+      posts
+    });
   } catch (error) {
     res.status(500).json({
       error: "게시글 목록을 불러오지 못했습니다.",
@@ -1230,7 +1802,10 @@ app.get("/api/board/hot", requireAuth, (req, res) => {
       like: boardPostLikeInfo(req.user.id, post.id)
     }));
 
-    res.json({ weekKey, posts });
+    res.json({
+      weekKey,
+      posts
+    });
   } catch (error) {
     res.status(500).json({
       error: "HOT 게시글을 불러오지 못했습니다.",
@@ -1259,7 +1834,9 @@ app.get("/api/board/posts/:postId", requireAuth, (req, res) => {
     `).get(postId);
 
     if (!post) {
-      return res.status(404).json({ error: "게시글을 찾을 수 없습니다." });
+      return res.status(404).json({
+        error: "게시글을 찾을 수 없습니다."
+      });
     }
 
     res.json({
@@ -1290,19 +1867,27 @@ app.post("/api/board/posts", requireAuth, upload.single("image"), (req, res) => 
     const body = String(req.body.body || "").trim();
 
     if (title.length < 1) {
-      return res.status(400).json({ error: "제목을 입력해야 합니다." });
+      return res.status(400).json({
+        error: "제목을 입력해야 합니다."
+      });
     }
 
     if (title.length > 100) {
-      return res.status(400).json({ error: "제목은 100자 이하로 입력해야 합니다." });
+      return res.status(400).json({
+        error: "제목은 100자 이하로 입력해야 합니다."
+      });
     }
 
     if (body.length < 1) {
-      return res.status(400).json({ error: "본문을 입력해야 합니다." });
+      return res.status(400).json({
+        error: "본문을 입력해야 합니다."
+      });
     }
 
     if (body.length > 3000) {
-      return res.status(400).json({ error: "본문은 3000자 이하로 입력해야 합니다." });
+      return res.status(400).json({
+        error: "본문은 3000자 이하로 입력해야 합니다."
+      });
     }
 
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
@@ -1311,7 +1896,14 @@ app.post("/api/board/posts", requireAuth, upload.single("image"), (req, res) => 
     const result = db.prepare(`
       INSERT INTO board_posts (user_id, title, body, image_url, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(req.user.id, title, body, imageUrl, now, now);
+    `).run(
+      req.user.id,
+      title,
+      body,
+      imageUrl,
+      now,
+      now
+    );
 
     res.status(201).json({
       message: "게시글이 등록되었습니다.",
@@ -1328,20 +1920,32 @@ app.post("/api/board/posts", requireAuth, upload.single("image"), (req, res) => 
 app.post("/api/board/posts/:postId/like", requireAuth, (req, res) => {
   try {
     const postId = Number(req.params.postId);
-    const weekKey = getKoreaIsoWeekKey();
 
-    const post = db.prepare("SELECT id FROM board_posts WHERE id = ?").get(postId);
+    const post = db.prepare(`
+      SELECT id
+      FROM board_posts
+      WHERE id = ?
+    `).get(postId);
 
     if (!post) {
-      return res.status(404).json({ error: "게시글을 찾을 수 없습니다." });
+      return res.status(404).json({
+        error: "게시글을 찾을 수 없습니다."
+      });
     }
+
+    const weekKey = getKoreaIsoWeekKey();
 
     db.prepare(`
       INSERT INTO board_post_likes (post_id, user_id, week_key, created_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(post_id, user_id, week_key)
       DO NOTHING
-    `).run(postId, req.user.id, weekKey, new Date().toISOString());
+    `).run(
+      postId,
+      req.user.id,
+      weekKey,
+      new Date().toISOString()
+    );
 
     res.json({
       message: "게시글 좋아요가 반영되었습니다.",
@@ -1382,20 +1986,30 @@ app.post("/api/board/posts/:postId/comments", requireAuth, (req, res) => {
     const postId = Number(req.params.postId);
     const { body, parentCommentId } = req.body;
 
-    const post = db.prepare("SELECT id FROM board_posts WHERE id = ?").get(postId);
+    const post = db.prepare(`
+      SELECT id
+      FROM board_posts
+      WHERE id = ?
+    `).get(postId);
 
     if (!post) {
-      return res.status(404).json({ error: "게시글을 찾을 수 없습니다." });
+      return res.status(404).json({
+        error: "게시글을 찾을 수 없습니다."
+      });
     }
 
     const commentBody = String(body || "").trim();
 
     if (commentBody.length < 1) {
-      return res.status(400).json({ error: "댓글 내용을 입력해야 합니다." });
+      return res.status(400).json({
+        error: "댓글 내용을 입력해야 합니다."
+      });
     }
 
     if (commentBody.length > 500) {
-      return res.status(400).json({ error: "댓글은 500자 이하로 입력해야 합니다." });
+      return res.status(400).json({
+        error: "댓글은 500자 이하로 입력해야 합니다."
+      });
     }
 
     let normalizedParentId = null;
@@ -1408,7 +2022,9 @@ app.post("/api/board/posts/:postId/comments", requireAuth, (req, res) => {
       `).get(Number(parentCommentId), postId);
 
       if (!parent) {
-        return res.status(400).json({ error: "대댓글을 달 원댓글을 찾을 수 없습니다." });
+        return res.status(400).json({
+          error: "대댓글을 달 원댓글을 찾을 수 없습니다."
+        });
       }
 
       normalizedParentId = Number(parentCommentId);
@@ -1451,20 +2067,32 @@ app.get("/api/board/comments/:commentId/like", requireAuth, (req, res) => {
 app.post("/api/board/comments/:commentId/like", requireAuth, (req, res) => {
   try {
     const commentId = Number(req.params.commentId);
-    const weekKey = getKoreaIsoWeekKey();
 
-    const comment = db.prepare("SELECT id FROM board_comments WHERE id = ?").get(commentId);
+    const comment = db.prepare(`
+      SELECT id
+      FROM board_comments
+      WHERE id = ?
+    `).get(commentId);
 
     if (!comment) {
-      return res.status(404).json({ error: "댓글을 찾을 수 없습니다." });
+      return res.status(404).json({
+        error: "댓글을 찾을 수 없습니다."
+      });
     }
+
+    const weekKey = getKoreaIsoWeekKey();
 
     db.prepare(`
       INSERT INTO board_comment_likes (comment_id, user_id, week_key, created_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(comment_id, user_id, week_key)
       DO NOTHING
-    `).run(commentId, req.user.id, weekKey, new Date().toISOString());
+    `).run(
+      commentId,
+      req.user.id,
+      weekKey,
+      new Date().toISOString()
+    );
 
     res.json({
       message: "댓글 좋아요가 반영되었습니다.",
@@ -1556,6 +2184,7 @@ app.get("/api/matches/:competition", async (req, res) => {
 
     const today = new Date();
     const after30Days = new Date();
+
     after30Days.setDate(today.getDate() + 30);
 
     const dateFrom = req.query.dateFrom || formatDate(today);
@@ -1602,24 +2231,26 @@ app.get("/api/team/:teamId/matches", async (req, res) => {
 
     const teamId = req.params.teamId;
     const status = req.query.status || "SCHEDULED";
-    const limit = req.query.limit || "5";
+    const limit = Number(req.query.limit || 5);
 
     const data = await footballDataRequest(
-      `https://api.football-data.org/v4/teams/${teamId}/matches?status=${status}&limit=${limit}`
+      `https://api.football-data.org/v4/teams/${teamId}/matches?status=${status}`
     );
+
+    const matches = data.matches.slice(0, limit).map(match => ({
+      id: match.id,
+      utcDate: match.utcDate,
+      status: match.status,
+      competition: match.competition?.name,
+      homeTeam: match.homeTeam.name,
+      awayTeam: match.awayTeam.name,
+      homeScore: match.score?.fullTime?.home,
+      awayScore: match.score?.fullTime?.away
+    }));
 
     res.json({
       count: data.resultSet?.count || data.matches.length,
-      matches: data.matches.map(match => ({
-        id: match.id,
-        utcDate: match.utcDate,
-        status: match.status,
-        competition: match.competition?.name,
-        homeTeam: match.homeTeam.name,
-        awayTeam: match.awayTeam.name,
-        homeScore: match.score?.fullTime?.home,
-        awayScore: match.score?.fullTime?.away
-      }))
+      matches
     });
   } catch (error) {
     res.status(error.status || 500).json({
@@ -1713,24 +2344,26 @@ app.get("/api/player/:playerId/matches", async (req, res) => {
 
     const playerId = req.params.playerId;
     const status = req.query.status || "FINISHED";
-    const limit = req.query.limit || "5";
+    const limit = Number(req.query.limit || 5);
 
     const data = await footballDataRequest(
-      `https://api.football-data.org/v4/persons/${playerId}/matches?status=${status}&limit=${limit}`
+      `https://api.football-data.org/v4/persons/${playerId}/matches?status=${status}`
     );
+
+    const matches = data.matches.slice(0, limit).map(match => ({
+      id: match.id,
+      utcDate: match.utcDate,
+      status: match.status,
+      competition: match.competition?.name,
+      homeTeam: match.homeTeam.name,
+      awayTeam: match.awayTeam.name,
+      homeScore: match.score?.fullTime?.home,
+      awayScore: match.score?.fullTime?.away
+    }));
 
     res.json({
       count: data.resultSet?.count || data.matches.length,
-      matches: data.matches.map(match => ({
-        id: match.id,
-        utcDate: match.utcDate,
-        status: match.status,
-        competition: match.competition?.name,
-        homeTeam: match.homeTeam.name,
-        awayTeam: match.awayTeam.name,
-        homeScore: match.score?.fullTime?.home,
-        awayScore: match.score?.fullTime?.away
-      }))
+      matches
     });
   } catch (error) {
     res.status(error.status || 500).json({
