@@ -53,10 +53,15 @@
       margin: 0 auto;
     }
 
-    .auth-grid {
+    .auth-grid,
+    .info-grid,
+    .follow-grid,
+    .match-card-grid,
+    .hot-grid,
+    .hot-board-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
     }
 
     .auth-box,
@@ -64,7 +69,9 @@
     .follow-card,
     .hot-card,
     .comment,
-    .match-card {
+    .match-card,
+    .board-post,
+    .board-comment {
       background: #1e293b;
       border: 1px solid #334155;
       border-radius: 14px;
@@ -258,13 +265,6 @@
       padding: 6px;
     }
 
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 10px;
-      margin-bottom: 15px;
-    }
-
     .info-box {
       background: #0f172a;
       border: 1px solid #334155;
@@ -277,19 +277,6 @@
       color: #94a3b8;
       font-size: 13px;
       margin-bottom: 5px;
-    }
-
-    .info-box strong {
-      color: #e5e7eb;
-    }
-
-    .follow-grid,
-    .match-card-grid,
-    .hot-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
     }
 
     .follow-card {
@@ -315,31 +302,7 @@
       padding: 4px;
     }
 
-    .follow-main strong {
-      display: block;
-    }
-
-    .follow-actions {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .match-card-title {
-      font-weight: bold;
-      margin-bottom: 6px;
-    }
-
-    .comment {
-      margin-bottom: 10px;
-    }
-
-    .reply {
-      margin-left: 28px;
-      background: #0f172a;
-    }
-
+    .follow-actions,
     .comment-actions {
       display: flex;
       gap: 8px;
@@ -347,7 +310,41 @@
       margin-top: 10px;
     }
 
-    .reply-box {
+    .match-card-title,
+    .board-post-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .board-post-title {
+      font-size: 20px;
+    }
+
+    .comment,
+    .board-comment {
+      margin-top: 10px;
+    }
+
+    .reply,
+    .board-reply {
+      margin-left: 28px;
+      background: #0f172a;
+    }
+
+    .board-form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .board-post {
+      margin-bottom: 12px;
+    }
+
+    .board-post img {
+      max-width: 100%;
+      max-height: 420px;
+      object-fit: contain;
+      border-radius: 12px;
       margin-top: 10px;
     }
 
@@ -385,11 +382,8 @@
         align-items: stretch;
       }
 
-      .follow-actions {
-        justify-content: stretch;
-      }
-
-      .reply {
+      .reply,
+      .board-reply {
         margin-left: 10px;
       }
     }
@@ -437,7 +431,7 @@
         <div class="app-top">
           <div>
             <h2>대시보드</h2>
-            <p class="small">통계, 일정, HOT, 프로필, 경기 예측, 댓글, 좋아요를 관리합니다.</p>
+            <p class="small">통계, 일정, HOT, 프로필, 경기 예측, 자유게시판을 관리합니다.</p>
           </div>
 
           <div>
@@ -459,6 +453,9 @@
         <h3>경기</h3>
         <div id="hotMatches" class="hot-grid"></div>
 
+        <h3>게시물</h3>
+        <div id="hotBoardPosts" class="hot-board-grid"></div>
+
         <p id="hotMessage" class="message"></p>
       </section>
 
@@ -477,6 +474,7 @@
           <button onclick="loadMatches()">일정</button>
           <button onclick="loadProfile()">프로필</button>
           <button onclick="loadScorers()">선수 득점 순위</button>
+          <button onclick="loadBoard()">자유게시판</button>
         </div>
       </section>
 
@@ -495,6 +493,28 @@
         <div id="followedTeamMatches" class="match-card-grid"></div>
 
         <p id="profileMessage" class="message"></p>
+      </section>
+
+      <section class="panel">
+        <h2>자유게시판</h2>
+
+        <div class="board-form">
+          <input type="text" id="boardTitle" placeholder="게시글 제목" />
+          <textarea id="boardBody" placeholder="내용을 입력하세요."></textarea>
+          <input type="file" id="boardImage" accept="image/*" />
+
+          <button onclick="createBoardPost()">게시글 등록</button>
+        </div>
+
+        <p id="boardMessage" class="message"></p>
+
+        <h3>게시글 목록</h3>
+        <div id="boardPosts"></div>
+      </section>
+
+      <section class="panel hidden" id="boardDetailPanel">
+        <h2>게시글 상세</h2>
+        <div id="boardDetail"></div>
       </section>
 
       <section class="panel hidden" id="matchRoomPanel">
@@ -525,7 +545,7 @@
 
         <h3>댓글</h3>
         <textarea id="matchCommentBody" placeholder="댓글을 입력하세요. 최대 500자"></textarea>
-        <button onclick="saveComment('match', currentMatch.itemId, currentMatch.itemName, currentMatch.itemMeta, null, 'matchCommentBody')">댓글 등록</button>
+        <button onclick="saveComment('match', currentMatch.itemId, null, 'matchCommentBody')">댓글 등록</button>
 
         <div id="matchCommentsList"></div>
       </section>
@@ -654,6 +674,7 @@
   <script>
     let currentUser = null;
     let currentMatch = null;
+    let currentBoardPostId = null;
 
     const itemCache = {};
     const teamCache = {};
@@ -679,6 +700,10 @@
 
     function getItemCache(itemType, itemId) {
       return itemCache[cacheKey(itemType, itemId)];
+    }
+
+    function safeDomId(text) {
+      return String(text).replace(/[^a-zA-Z0-9_-]/g, "_");
     }
 
     function setDefaultDates() {
@@ -827,9 +852,7 @@
 
     async function logout() {
       try {
-        await requestJson("/api/logout", {
-          method: "POST"
-        });
+        await requestJson("/api/logout", { method: "POST" });
 
         currentUser = null;
         showAuthView();
@@ -839,15 +862,11 @@
     }
 
     function getCrestImage(src, name) {
-      return src
-        ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(name)}">`
-        : "";
+      return src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(name)}">` : "";
     }
 
     function formatKoreanTime(utcDate) {
-      if (!utcDate) {
-        return "-";
-      }
+      if (!utcDate) return "-";
 
       return new Date(utcDate).toLocaleString("ko-KR", {
         timeZone: "Asia/Seoul",
@@ -876,22 +895,19 @@
       return `${match.homeScore} : ${match.awayScore}`;
     }
 
-    function safeDomId(text) {
-      return String(text).replace(/[^a-zA-Z0-9_-]/g, "_");
-    }
-
     function saveTeamCache(team) {
       const id = String(team.teamId || team.id);
+      const old = teamCache[id]?.itemMeta || {};
 
       const item = {
         itemType: "team",
         itemId: id,
         itemName: team.teamName || team.name,
         itemMeta: {
-          crest: team.crest,
-          shortName: team.shortName,
-          tla: team.tla,
-          venue: team.venue
+          crest: team.crest || old.crest,
+          shortName: team.shortName || old.shortName,
+          tla: team.tla || old.tla,
+          venue: team.venue || old.venue
         }
       };
 
@@ -901,16 +917,17 @@
 
     function savePlayerCache(player) {
       const id = String(player.playerId || player.id);
+      const old = playerCache[id]?.itemMeta || {};
 
       const item = {
         itemType: "player",
         itemId: id,
         itemName: player.playerName || player.name,
         itemMeta: {
-          position: player.position,
-          nationality: player.nationality,
-          teamName: player.teamName,
-          teamCrest: player.teamCrest
+          position: player.position || old.position,
+          nationality: player.nationality || old.nationality,
+          teamName: player.teamName || old.teamName,
+          teamCrest: player.teamCrest || old.teamCrest
         }
       };
 
@@ -920,19 +937,20 @@
 
     function saveMatchCache(match) {
       const id = String(match.id);
+      const old = matchCache[id]?.itemMeta || {};
 
       const item = {
         itemType: "match",
         itemId: id,
-        itemName: `${match.homeTeam} vs ${match.awayTeam}`,
+        itemName: `${match.homeTeam || old.homeTeam} vs ${match.awayTeam || old.awayTeam}`,
         itemMeta: {
-          utcDate: match.utcDate,
-          homeTeam: match.homeTeam,
-          awayTeam: match.awayTeam,
-          homeCrest: match.homeCrest,
-          awayCrest: match.awayCrest,
-          competition: match.competition,
-          status: match.status
+          utcDate: match.utcDate || old.utcDate,
+          homeTeam: match.homeTeam || old.homeTeam,
+          awayTeam: match.awayTeam || old.awayTeam,
+          homeCrest: match.homeCrest || old.homeCrest,
+          awayCrest: match.awayCrest || old.awayCrest,
+          competition: match.competition || old.competition,
+          status: match.status || old.status
         }
       };
 
@@ -980,9 +998,7 @@
     async function refreshLikeButton(itemType, itemId) {
       const button = document.getElementById(`like-${itemType}-${safeDomId(itemId)}`);
 
-      if (!button) {
-        return;
-      }
+      if (!button) return;
 
       try {
         const data = await requestJson(`/api/likes/${itemType}/${itemId}`);
@@ -1047,6 +1063,7 @@
       });
 
       const meta = item.itemMeta || {};
+
       const image = item.itemType === "team"
         ? getCrestImage(meta.crest, item.itemName)
         : item.itemType === "player"
@@ -1102,6 +1119,28 @@
       }
     }
 
+    async function loadHotBoardPosts() {
+      const container = document.getElementById("hotBoardPosts");
+
+      try {
+        const data = await requestJson("/api/board/hot");
+
+        container.innerHTML = data.posts.length
+          ? data.posts.map(post => `
+            <div class="hot-card">
+              <strong>${escapeHtml(post.title)}</strong>
+              <p class="small">
+                ${escapeHtml(post.nickname)} · 이번 주 좋아요 ${escapeHtml(post.likeCount)}개
+              </p>
+              <button class="secondary-btn" onclick="openBoardPost(${post.id})">게시글 보기</button>
+            </div>
+          `).join("")
+          : `<p class="small">HOT 게시글이 없습니다.</p>`;
+      } catch {
+        container.innerHTML = `<p class="small">HOT 게시글을 불러오지 못했습니다.</p>`;
+      }
+    }
+
     function renderFollowCard(item) {
       const meta = item.itemMeta || {};
       const isTeam = item.itemType === "team";
@@ -1140,9 +1179,7 @@
     }
 
     async function loadProfile() {
-      if (!currentUser) {
-        return;
-      }
+      if (!currentUser) return;
 
       const profileInfo = document.getElementById("profileInfo");
       const followedTeams = document.getElementById("followedTeams");
@@ -1255,6 +1292,7 @@
         itemMeta: {}
       };
 
+      setItemCache(cached);
       currentMatch = cached;
 
       const data = await requestJson(`/api/match-room/${matchId}`);
@@ -1303,13 +1341,11 @@
         document.getElementById("predAwayScore").value = data.myPrediction.away_score;
       }
 
-      renderComments("match", matchId, cached.itemName, cached.itemMeta, data.comments, "matchCommentsList");
+      renderComments("match", matchId, data.comments, "matchCommentsList");
     }
 
     async function likeMatchRoom() {
-      if (!currentMatch) {
-        return;
-      }
+      if (!currentMatch) return;
 
       await toggleLike(currentMatch.itemType, currentMatch.itemId);
     }
@@ -1322,20 +1358,31 @@
       let home = Number(homeInput.value);
       let away = Number(awayInput.value);
 
-      if (!Number.isInteger(home) || home < 0) {
-        home = 0;
+      if (!Number.isInteger(home) || home < 0) home = 0;
+      if (!Number.isInteger(away) || away < 0) away = 0;
+
+      if (result === "home") {
+        if (home < away) {
+          const temp = home;
+          home = away;
+          away = temp;
+        }
+
+        if (home === away) {
+          home = away + 1;
+        }
       }
 
-      if (!Number.isInteger(away) || away < 0) {
-        away = 0;
-      }
+      if (result === "away") {
+        if (home > away) {
+          const temp = home;
+          home = away;
+          away = temp;
+        }
 
-      if (result === "home" && home <= away) {
-        home = away + 1;
-      }
-
-      if (result === "away" && away <= home) {
-        away = home + 1;
+        if (home === away) {
+          away = home + 1;
+        }
       }
 
       if (result === "draw") {
@@ -1349,9 +1396,7 @@
     }
 
     async function savePrediction() {
-      if (!currentMatch) {
-        return;
-      }
+      if (!currentMatch) return;
 
       normalizePredictionScore();
 
@@ -1383,8 +1428,14 @@
       }
     }
 
-    async function saveComment(itemType, itemId, itemName, itemMeta, parentCommentId, textareaId) {
+    async function saveComment(itemType, itemId, parentCommentId, textareaId) {
+      const item = getItemCache(itemType, itemId);
       const textarea = document.getElementById(textareaId);
+
+      if (!item) {
+        alert("댓글 대상 정보를 찾지 못했습니다.");
+        return;
+      }
 
       try {
         await requestJson("/api/comments", {
@@ -1395,8 +1446,8 @@
           body: JSON.stringify({
             itemType,
             itemId,
-            itemName,
-            itemMeta,
+            itemName: item.itemName,
+            itemMeta: item.itemMeta,
             parentCommentId,
             body: textarea.value
           })
@@ -1404,23 +1455,23 @@
 
         textarea.value = "";
 
-        await reloadComments(itemType, itemId, itemName, itemMeta);
+        await reloadComments(itemType, itemId);
       } catch (error) {
         alert(error.message);
       }
     }
 
-    async function reloadComments(itemType, itemId, itemName, itemMeta) {
+    async function reloadComments(itemType, itemId) {
       const data = await requestJson(`/api/comments/${itemType}/${itemId}`);
 
       const containerId = itemType === "match"
         ? "matchCommentsList"
         : `${itemType}Comments-${safeDomId(itemId)}`;
 
-      renderComments(itemType, itemId, itemName, itemMeta, data.comments, containerId);
+      renderComments(itemType, itemId, data.comments, containerId);
     }
 
-    async function toggleCommentLike(commentId, itemType, itemId, itemName, itemMeta) {
+    async function toggleCommentLike(commentId, itemType, itemId) {
       try {
         const info = await requestJson(`/api/comment-likes/${commentId}`);
 
@@ -1434,18 +1485,16 @@
           });
         }
 
-        await reloadComments(itemType, itemId, itemName, itemMeta);
+        await reloadComments(itemType, itemId);
       } catch (error) {
         alert(error.message);
       }
     }
 
-    function renderComments(itemType, itemId, itemName, itemMeta, comments, containerId) {
+    function renderComments(itemType, itemId, comments, containerId) {
       const container = document.getElementById(containerId);
 
-      if (!container) {
-        return;
-      }
+      if (!container) return;
 
       const topLevel = comments.filter(comment => !comment.parentCommentId);
       const repliesByParent = {};
@@ -1469,13 +1518,11 @@
         comment,
         repliesByParent[comment.id] || [],
         itemType,
-        itemId,
-        itemName,
-        itemMeta
+        itemId
       )).join("");
     }
 
-    function renderCommentBlock(comment, replies, itemType, itemId, itemName, itemMeta) {
+    function renderCommentBlock(comment, replies, itemType, itemId) {
       const replyTextareaId = `reply-${comment.id}`;
 
       return `
@@ -1487,17 +1534,15 @@
 
           <div class="comment-actions">
             <button class="${comment.like.liked ? "danger-btn" : "muted-btn"}"
-              onclick='toggleCommentLike(${comment.id}, "${itemType}", "${escapeHtml(itemId)}", ${JSON.stringify(itemName)}, ${JSON.stringify(itemMeta || {})})'>
+              onclick="toggleCommentLike(${comment.id}, '${itemType}', '${escapeHtml(itemId)}')">
               ${comment.like.liked ? "♥" : "♡"} ${comment.like.count}
             </button>
           </div>
 
-          <div class="reply-box">
-            <textarea id="${replyTextareaId}" placeholder="대댓글을 입력하세요."></textarea>
-            <button onclick='saveComment("${itemType}", "${escapeHtml(itemId)}", ${JSON.stringify(itemName)}, ${JSON.stringify(itemMeta || {})}, ${comment.id}, "${replyTextareaId}")'>
-              대댓글 등록
-            </button>
-          </div>
+          <textarea id="${replyTextareaId}" placeholder="대댓글을 입력하세요."></textarea>
+          <button onclick="saveComment('${itemType}', '${escapeHtml(itemId)}', ${comment.id}, '${replyTextareaId}')">
+            대댓글 등록
+          </button>
 
           ${replies.map(reply => `
             <div class="comment reply">
@@ -1508,7 +1553,7 @@
 
               <div class="comment-actions">
                 <button class="${reply.like.liked ? "danger-btn" : "muted-btn"}"
-                  onclick='toggleCommentLike(${reply.id}, "${itemType}", "${escapeHtml(itemId)}", ${JSON.stringify(itemName)}, ${JSON.stringify(itemMeta || {})})'>
+                  onclick="toggleCommentLike(${reply.id}, '${itemType}', '${escapeHtml(itemId)}')">
                   ${reply.like.liked ? "♥" : "♡"} ${reply.like.count}
                 </button>
               </div>
@@ -1516,6 +1561,281 @@
           `).join("")}
         </div>
       `;
+    }
+
+    async function loadBoard() {
+      const boardPosts = document.getElementById("boardPosts");
+      const boardMessage = document.getElementById("boardMessage");
+
+      boardPosts.innerHTML = "";
+      boardMessage.textContent = "게시글을 불러오는 중...";
+      boardMessage.className = "message";
+
+      try {
+        const data = await requestJson("/api/board/posts");
+
+        boardPosts.innerHTML = data.posts.length
+          ? data.posts.map(renderBoardPostCard).join("")
+          : `<p class="small">아직 게시글이 없습니다.</p>`;
+
+        boardMessage.textContent = `총 ${data.posts.length}개 게시글`;
+        boardMessage.className = "message success-message";
+      } catch (error) {
+        boardMessage.textContent = error.message;
+      }
+    }
+
+    function renderBoardPostCard(post) {
+      return `
+        <div class="board-post">
+          <div class="board-post-title">${escapeHtml(post.title)}</div>
+
+          <p class="small">
+            작성자: ${escapeHtml(post.nickname)} · ${escapeHtml(formatKoreanTime(post.createdAt))}
+          </p>
+
+          <p>${escapeHtml(post.body).slice(0, 180)}${post.body.length > 180 ? "..." : ""}</p>
+
+          ${post.imageUrl ? `<img src="${escapeHtml(post.imageUrl)}" alt="게시글 이미지">` : ""}
+
+          <div class="controls">
+            <button class="secondary-btn" onclick="openBoardPost(${post.id})">보기</button>
+            <button class="${post.like.liked ? "danger-btn" : "muted-btn"}" onclick="toggleBoardPostLike(${post.id})">
+              ${post.like.liked ? "♥" : "♡"} ${post.like.count}
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function createBoardPost() {
+      const titleInput = document.getElementById("boardTitle");
+      const bodyInput = document.getElementById("boardBody");
+      const imageInput = document.getElementById("boardImage");
+      const boardMessage = document.getElementById("boardMessage");
+
+      boardMessage.textContent = "게시글 등록 중...";
+      boardMessage.className = "message";
+
+      try {
+        const formData = new FormData();
+
+        formData.append("title", titleInput.value);
+        formData.append("body", bodyInput.value);
+
+        if (imageInput.files[0]) {
+          formData.append("image", imageInput.files[0]);
+        }
+
+        const response = await fetch("/api/board/posts", {
+          method: "POST",
+          credentials: "include",
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "게시글 등록 실패");
+        }
+
+        titleInput.value = "";
+        bodyInput.value = "";
+        imageInput.value = "";
+
+        boardMessage.textContent = "게시글이 등록되었습니다.";
+        boardMessage.className = "message success-message";
+
+        await loadBoard();
+        await loadHotBoardPosts();
+      } catch (error) {
+        boardMessage.textContent = error.message;
+      }
+    }
+
+    async function openBoardPost(postId) {
+      currentBoardPostId = postId;
+
+      const boardDetailPanel = document.getElementById("boardDetailPanel");
+      const boardDetail = document.getElementById("boardDetail");
+
+      boardDetailPanel.classList.remove("hidden");
+      boardDetail.innerHTML = `<div class="detail-card">게시글을 불러오는 중...</div>`;
+
+      try {
+        const data = await requestJson(`/api/board/posts/${postId}`);
+        const post = data.post;
+
+        boardDetail.innerHTML = `
+          <div class="board-post">
+            <div class="board-post-title">${escapeHtml(post.title)}</div>
+
+            <p class="small">
+              작성자: ${escapeHtml(post.nickname)} · ${escapeHtml(formatKoreanTime(post.createdAt))}
+            </p>
+
+            <p>${escapeHtml(post.body)}</p>
+
+            ${post.imageUrl ? `<img src="${escapeHtml(post.imageUrl)}" alt="게시글 이미지">` : ""}
+
+            <div class="controls">
+              <button class="${post.like.liked ? "danger-btn" : "muted-btn"}" onclick="toggleBoardPostLike(${post.id})">
+                ${post.like.liked ? "♥" : "♡"} ${post.like.count}
+              </button>
+            </div>
+
+            <h3>댓글</h3>
+
+            <textarea id="boardCommentBody" placeholder="댓글을 입력하세요."></textarea>
+            <button onclick="createBoardComment(${post.id}, null, 'boardCommentBody')">댓글 등록</button>
+
+            <div id="boardComments"></div>
+          </div>
+        `;
+
+        renderBoardComments(data.comments, post.id);
+
+        boardDetailPanel.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      } catch (error) {
+        boardDetail.innerHTML = `<div class="detail-card message">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    function renderBoardComments(comments, postId) {
+      const container = document.getElementById("boardComments");
+
+      const topLevel = comments.filter(comment => !comment.parentCommentId);
+      const repliesByParent = {};
+
+      comments
+        .filter(comment => comment.parentCommentId)
+        .forEach(comment => {
+          if (!repliesByParent[comment.parentCommentId]) {
+            repliesByParent[comment.parentCommentId] = [];
+          }
+
+          repliesByParent[comment.parentCommentId].push(comment);
+        });
+
+      container.innerHTML = topLevel.length
+        ? topLevel.map(comment => renderBoardCommentBlock(comment, repliesByParent[comment.id] || [], postId)).join("")
+        : `<p class="small">댓글이 없습니다.</p>`;
+    }
+
+    function renderBoardCommentBlock(comment, replies, postId) {
+      const replyInputId = `boardReply-${comment.id}`;
+
+      return `
+        <div class="board-comment">
+          <strong>${escapeHtml(comment.nickname)}</strong>
+          <span class="small">${escapeHtml(formatKoreanTime(comment.createdAt))}</span>
+
+          <div>${escapeHtml(comment.body)}</div>
+
+          <div class="controls">
+            <button class="${comment.like.liked ? "danger-btn" : "muted-btn"}" onclick="toggleBoardCommentLike(${comment.id})">
+              ${comment.like.liked ? "♥" : "♡"} ${comment.like.count}
+            </button>
+          </div>
+
+          <textarea id="${replyInputId}" placeholder="대댓글을 입력하세요."></textarea>
+          <button onclick="createBoardComment(${postId}, ${comment.id}, '${replyInputId}')">대댓글 등록</button>
+
+          ${replies.map(reply => `
+            <div class="board-comment board-reply">
+              <strong>${escapeHtml(reply.nickname)}</strong>
+              <span class="small">${escapeHtml(formatKoreanTime(reply.createdAt))}</span>
+
+              <div>${escapeHtml(reply.body)}</div>
+
+              <div class="controls">
+                <button class="${reply.like.liked ? "danger-btn" : "muted-btn"}" onclick="toggleBoardCommentLike(${reply.id})">
+                  ${reply.like.liked ? "♥" : "♡"} ${reply.like.count}
+                </button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    async function createBoardComment(postId, parentCommentId, textareaId) {
+      const textarea = document.getElementById(textareaId);
+
+      try {
+        await requestJson(`/api/board/posts/${postId}/comments`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            body: textarea.value,
+            parentCommentId
+          })
+        });
+
+        textarea.value = "";
+
+        await openBoardPost(postId);
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    async function toggleBoardPostLike(postId) {
+      try {
+        const data = await requestJson(`/api/board/posts/${postId}`);
+        const like = data.post.like;
+
+        if (like.liked) {
+          await requestJson(`/api/board/posts/${postId}/like`, {
+            method: "DELETE"
+          });
+        } else {
+          await requestJson(`/api/board/posts/${postId}/like`, {
+            method: "POST"
+          });
+        }
+
+        await loadBoard();
+        await loadHotBoardPosts();
+
+        if (currentBoardPostId === postId) {
+          await openBoardPost(postId);
+        }
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    async function toggleBoardCommentLike(commentId) {
+      try {
+        const postId = currentBoardPostId;
+
+        const data = await requestJson(`/api/board/posts/${postId}`);
+        const target = data.comments.find(comment => comment.id === commentId);
+
+        if (!target) {
+          throw new Error("댓글 정보를 찾을 수 없습니다.");
+        }
+
+        if (target.like.liked) {
+          await requestJson(`/api/board/comments/${commentId}/like`, {
+            method: "DELETE"
+          });
+        } else {
+          await requestJson(`/api/board/comments/${commentId}/like`, {
+            method: "POST"
+          });
+        }
+
+        await openBoardPost(postId);
+      } catch (error) {
+        alert(error.message);
+      }
     }
 
     async function loadStandings() {
@@ -1593,12 +1913,7 @@
       matchMessage.className = "message";
 
       try {
-        const query = new URLSearchParams({
-          dateFrom,
-          dateTo,
-          status
-        });
-
+        const query = new URLSearchParams({ dateFrom, dateTo, status });
         const data = await requestJson(`/api/matches/${competition}?${query.toString()}`);
 
         matchTitle.textContent = `${data.competition} 경기 일정`;
@@ -1666,7 +1981,6 @@
 
         const teamItem = getItemCache("team", team.id);
         const commentsData = await requestJson(`/api/comments/team/${team.id}`);
-
         const commentsContainerId = `teamComments-${safeDomId(team.id)}`;
 
         const squadRows = team.squad.map(player => {
@@ -1807,7 +2121,7 @@
 
             <h3>이번 주 팀 댓글</h3>
             <textarea id="teamCommentBody-${safeDomId(team.id)}" placeholder="팀 댓글을 입력하세요."></textarea>
-            <button onclick='saveComment("team", "${team.id}", ${JSON.stringify(team.name)}, ${JSON.stringify(teamItem.itemMeta)}, null, "teamCommentBody-${safeDomId(team.id)}")'>
+            <button onclick="saveComment('team', '${team.id}', null, 'teamCommentBody-${safeDomId(team.id)}')">
               댓글 등록
             </button>
 
@@ -1815,7 +2129,7 @@
           </div>
         `;
 
-        renderComments("team", team.id, team.name, teamItem.itemMeta, commentsData.comments, commentsContainerId);
+        renderComments("team", team.id, commentsData.comments, commentsContainerId);
 
         teamDetail.scrollIntoView({
           behavior: "smooth",
@@ -1977,7 +2291,7 @@
 
             <h3>이번 주 선수 댓글</h3>
             <textarea id="playerCommentBody-${safeDomId(player.id)}" placeholder="선수 댓글을 입력하세요."></textarea>
-            <button onclick='saveComment("player", "${player.id}", ${JSON.stringify(player.name)}, ${JSON.stringify(playerItem.itemMeta)}, null, "playerCommentBody-${safeDomId(player.id)}")'>
+            <button onclick="saveComment('player', '${player.id}', null, 'playerCommentBody-${safeDomId(player.id)}')">
               댓글 등록
             </button>
 
@@ -1985,7 +2299,7 @@
           </div>
         `;
 
-        renderComments("player", player.id, player.name, playerItem.itemMeta, commentsData.comments, commentsContainerId);
+        renderComments("player", player.id, commentsData.comments, commentsContainerId);
 
         playerDetail.scrollIntoView({
           behavior: "smooth",
@@ -1998,10 +2312,12 @@
 
     async function loadAll() {
       await loadHot();
+      await loadHotBoardPosts();
       await loadProfile();
       await loadStandings();
       await loadMatches();
       await loadScorers();
+      await loadBoard();
     }
 
     setDefaultDates();

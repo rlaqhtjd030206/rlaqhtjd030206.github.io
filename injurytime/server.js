@@ -4,6 +4,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const Database = require("better-sqlite3");
+const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
@@ -19,18 +20,38 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.FOOTBALL_DATA_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
-
 const allowedCompetitions = ["PL", "PD", "BL1", "SA", "FL1"];
 
 const DATA_DIR = path.join(__dirname, "data");
 const DB_FILE = path.join(DATA_DIR, "app.db");
+const UPLOAD_DIR = path.join(__dirname, "public", "uploads");
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR);
-}
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error("이미지 파일만 업로드할 수 있습니다."));
+    }
+
+    cb(null, true);
+  }
+});
 
 const db = new Database(DB_FILE);
-
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
@@ -120,6 +141,59 @@ db.prepare(`
   )
 `).run();
 
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS board_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    image_url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`).run();
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS board_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    parent_comment_id INTEGER,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(post_id) REFERENCES board_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(parent_comment_id) REFERENCES board_comments(id) ON DELETE CASCADE
+  )
+`).run();
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS board_post_likes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    week_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(post_id, user_id, week_key),
+    FOREIGN KEY(post_id) REFERENCES board_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`).run();
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS board_comment_likes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    comment_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    week_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(comment_id, user_id, week_key),
+    FOREIGN KEY(comment_id) REFERENCES board_comments(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`).run();
+
 function formatDate(date) {
   return date.toISOString().split("T")[0];
 }
@@ -135,7 +209,6 @@ function getKoreaIsoWeekKey(date = new Date()) {
   ));
 
   const day = d.getUTCDay() || 7;
-
   d.setUTCDate(d.getUTCDate() + 4 - day);
 
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -145,9 +218,7 @@ function getKoreaIsoWeekKey(date = new Date()) {
 }
 
 function safeJsonParse(value, fallback = {}) {
-  if (!value) {
-    return fallback;
-  }
+  if (!value) return fallback;
 
   try {
     return JSON.parse(value);
@@ -161,9 +232,7 @@ function isValidEmail(email) {
 }
 
 function sanitizeUser(user) {
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return {
     id: user.id,
@@ -186,9 +255,7 @@ function createToken(user) {
       nickname: user.nickname
     },
     JWT_SECRET,
-    {
-      expiresIn: JWT_EXPIRES_IN
-    }
+    { expiresIn: JWT_EXPIRES_IN }
   );
 }
 
@@ -214,15 +281,11 @@ function requireAuth(req, res, next) {
     const token = req.cookies.auth_token;
 
     if (!token) {
-      return res.status(401).json({
-        error: "로그인이 필요합니다."
-      });
+      return res.status(401).json({ error: "로그인이 필요합니다." });
     }
 
     if (!JWT_SECRET) {
-      return res.status(500).json({
-        error: ".env 파일에 JWT_SECRET이 없습니다."
-      });
+      return res.status(500).json({ error: ".env 파일에 JWT_SECRET이 없습니다." });
     }
 
     const payload = jwt.verify(token, JWT_SECRET);
@@ -233,35 +296,25 @@ function requireAuth(req, res, next) {
 
     if (!user) {
       clearAuthCookie(res);
-
-      return res.status(401).json({
-        error: "유효하지 않은 사용자입니다."
-      });
+      return res.status(401).json({ error: "유효하지 않은 사용자입니다." });
     }
 
     req.user = user;
     next();
   } catch {
     clearAuthCookie(res);
-
-    return res.status(401).json({
-      error: "로그인이 만료되었거나 유효하지 않습니다."
-    });
+    return res.status(401).json({ error: "로그인이 만료되었거나 유효하지 않습니다." });
   }
 }
 
 function checkCompetition(competition, res) {
   if (!allowedCompetitions.includes(competition)) {
-    res.status(400).json({
-      error: "지원하지 않는 리그 코드입니다."
-    });
+    res.status(400).json({ error: "지원하지 않는 리그 코드입니다." });
     return true;
   }
 
   if (!API_KEY) {
-    res.status(500).json({
-      error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다."
-    });
+    res.status(500).json({ error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다." });
     return true;
   }
 
@@ -270,9 +323,7 @@ function checkCompetition(competition, res) {
 
 function checkApiKey(res) {
   if (!API_KEY) {
-    res.status(500).json({
-      error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다."
-    });
+    res.status(500).json({ error: ".env 파일에 FOOTBALL_DATA_API_KEY가 없습니다." });
     return true;
   }
 
@@ -281,9 +332,7 @@ function checkApiKey(res) {
 
 async function footballDataRequest(url) {
   const response = await fetch(url, {
-    headers: {
-      "X-Auth-Token": API_KEY
-    }
+    headers: { "X-Auth-Token": API_KEY }
   });
 
   const text = await response.text();
@@ -336,13 +385,13 @@ function commentLikeInfo(userId, commentId) {
     SELECT COUNT(*) AS count
     FROM comment_likes
     WHERE comment_id = ? AND week_key = ?
-  `).get(commentId, weekKey).count;
+  `).get(Number(commentId), weekKey).count;
 
   const mine = db.prepare(`
     SELECT id
     FROM comment_likes
     WHERE user_id = ? AND comment_id = ? AND week_key = ?
-  `).get(userId, commentId, weekKey);
+  `).get(userId, Number(commentId), weekKey);
 
   return {
     weekKey,
@@ -375,24 +424,20 @@ function getCommentsForItem(userId, itemType, itemId) {
     ORDER BY c.created_at ASC
   `).all(itemType, String(itemId), weekKey);
 
-  return rows.map(row => {
-    const like = commentLikeInfo(userId, row.id);
-
-    return {
-      id: row.id,
-      userId: row.user_id,
-      nickname: row.nickname,
-      itemType: row.item_type,
-      itemId: row.item_id,
-      itemName: row.item_name,
-      itemMeta: safeJsonParse(row.item_meta),
-      parentCommentId: row.parent_comment_id,
-      body: row.body,
-      weekKey: row.week_key,
-      createdAt: row.created_at,
-      like
-    };
-  });
+  return rows.map(row => ({
+    id: row.id,
+    userId: row.user_id,
+    nickname: row.nickname,
+    itemType: row.item_type,
+    itemId: row.item_id,
+    itemName: row.item_name,
+    itemMeta: safeJsonParse(row.item_meta),
+    parentCommentId: row.parent_comment_id,
+    body: row.body,
+    weekKey: row.week_key,
+    createdAt: row.created_at,
+    like: commentLikeInfo(userId, row.id)
+  }));
 }
 
 function validatePredictionAndScore(predictionResult, homeScore, awayScore) {
@@ -409,6 +454,78 @@ function validatePredictionAndScore(predictionResult, homeScore, awayScore) {
   }
 
   return null;
+}
+
+function boardPostLikeInfo(userId, postId) {
+  const weekKey = getKoreaIsoWeekKey();
+
+  const count = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM board_post_likes
+    WHERE post_id = ? AND week_key = ?
+  `).get(Number(postId), weekKey).count;
+
+  const mine = db.prepare(`
+    SELECT id
+    FROM board_post_likes
+    WHERE post_id = ? AND user_id = ? AND week_key = ?
+  `).get(Number(postId), userId, weekKey);
+
+  return {
+    weekKey,
+    count,
+    liked: Boolean(mine)
+  };
+}
+
+function boardCommentLikeInfo(userId, commentId) {
+  const weekKey = getKoreaIsoWeekKey();
+
+  const count = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM board_comment_likes
+    WHERE comment_id = ? AND week_key = ?
+  `).get(Number(commentId), weekKey).count;
+
+  const mine = db.prepare(`
+    SELECT id
+    FROM board_comment_likes
+    WHERE comment_id = ? AND user_id = ? AND week_key = ?
+  `).get(Number(commentId), userId, weekKey);
+
+  return {
+    weekKey,
+    count,
+    liked: Boolean(mine)
+  };
+}
+
+function getBoardComments(userId, postId) {
+  const rows = db.prepare(`
+    SELECT
+      c.id,
+      c.post_id,
+      c.user_id,
+      c.parent_comment_id,
+      c.body,
+      c.created_at,
+      u.nickname
+    FROM board_comments c
+    JOIN users u ON u.id = c.user_id
+    WHERE c.post_id = ?
+    ORDER BY c.created_at ASC
+  `).all(Number(postId));
+
+  return rows.map(row => ({
+    id: row.id,
+    postId: row.post_id,
+    userId: row.user_id,
+    parentCommentId: row.parent_comment_id,
+    body: row.body,
+    createdAt: row.created_at,
+    nickname: row.nickname,
+    like: boardCommentLikeInfo(userId, row.id)
+  }));
 }
 
 /* =========================
@@ -431,37 +548,25 @@ app.post("/api/signup", async (req, res) => {
     const plainPassword = String(password);
 
     if (trimmedNickname.length < 2) {
-      return res.status(400).json({
-        error: "닉네임은 2글자 이상이어야 합니다."
-      });
+      return res.status(400).json({ error: "닉네임은 2글자 이상이어야 합니다." });
     }
 
     if (!Number.isInteger(parsedAge) || parsedAge < 1 || parsedAge > 120) {
-      return res.status(400).json({
-        error: "나이는 1부터 120 사이의 숫자여야 합니다."
-      });
+      return res.status(400).json({ error: "나이는 1부터 120 사이의 숫자여야 합니다." });
     }
 
     if (!isValidEmail(normalizedEmail)) {
-      return res.status(400).json({
-        error: "올바른 이메일 형식이 아닙니다."
-      });
+      return res.status(400).json({ error: "올바른 이메일 형식이 아닙니다." });
     }
 
     if (plainPassword.length < 8) {
-      return res.status(400).json({
-        error: "비밀번호는 8자 이상이어야 합니다."
-      });
+      return res.status(400).json({ error: "비밀번호는 8자 이상이어야 합니다." });
     }
 
-    const exists = db
-      .prepare("SELECT id FROM users WHERE email = ?")
-      .get(normalizedEmail);
+    const exists = db.prepare("SELECT id FROM users WHERE email = ?").get(normalizedEmail);
 
     if (exists) {
-      return res.status(409).json({
-        error: "이미 가입된 이메일입니다."
-      });
+      return res.status(409).json({ error: "이미 가입된 이메일입니다." });
     }
 
     const passwordHash = await bcrypt.hash(plainPassword, 12);
@@ -501,29 +606,21 @@ app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
-        error: "이메일과 비밀번호를 모두 입력해야 합니다."
-      });
+      return res.status(400).json({ error: "이메일과 비밀번호를 모두 입력해야 합니다." });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
 
-    const user = db
-      .prepare("SELECT * FROM users WHERE email = ?")
-      .get(normalizedEmail);
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(normalizedEmail);
 
     if (!user) {
-      return res.status(401).json({
-        error: "이메일 또는 비밀번호가 올바르지 않습니다."
-      });
+      return res.status(401).json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." });
     }
 
     const ok = await bcrypt.compare(String(password), user.password_hash);
 
     if (!ok) {
-      return res.status(401).json({
-        error: "이메일 또는 비밀번호가 올바르지 않습니다."
-      });
+      return res.status(401).json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." });
     }
 
     const token = createToken(user);
@@ -542,17 +639,12 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.get("/api/me", requireAuth, (req, res) => {
-  res.json({
-    user: sanitizeUser(req.user)
-  });
+  res.json({ user: sanitizeUser(req.user) });
 });
 
 app.post("/api/logout", (req, res) => {
   clearAuthCookie(res);
-
-  res.json({
-    message: "로그아웃되었습니다."
-  });
+  res.json({ message: "로그아웃되었습니다." });
 });
 
 /* =========================
@@ -594,15 +686,11 @@ app.post("/api/follows", requireAuth, (req, res) => {
     const { itemType, itemId, itemName, itemMeta } = req.body;
 
     if (!itemType || !itemId || !itemName) {
-      return res.status(400).json({
-        error: "팔로우 대상 정보가 부족합니다."
-      });
+      return res.status(400).json({ error: "팔로우 대상 정보가 부족합니다." });
     }
 
     if (!["team", "player"].includes(itemType)) {
-      return res.status(400).json({
-        error: "팔로우 타입은 team 또는 player만 가능합니다."
-      });
+      return res.status(400).json({ error: "팔로우 타입은 team 또는 player만 가능합니다." });
     }
 
     db.prepare(`
@@ -621,9 +709,7 @@ app.post("/api/follows", requireAuth, (req, res) => {
       new Date().toISOString()
     );
 
-    res.status(201).json({
-      message: "팔로우가 완료되었습니다."
-    });
+    res.status(201).json({ message: "팔로우가 완료되었습니다." });
   } catch (error) {
     res.status(500).json({
       error: "팔로우 처리 중 오류가 발생했습니다.",
@@ -637,9 +723,7 @@ app.delete("/api/follows/:itemType/:itemId", requireAuth, (req, res) => {
     const { itemType, itemId } = req.params;
 
     if (!["team", "player"].includes(itemType)) {
-      return res.status(400).json({
-        error: "팔로우 타입은 team 또는 player만 가능합니다."
-      });
+      return res.status(400).json({ error: "팔로우 타입은 team 또는 player만 가능합니다." });
     }
 
     db.prepare(`
@@ -647,9 +731,7 @@ app.delete("/api/follows/:itemType/:itemId", requireAuth, (req, res) => {
       WHERE user_id = ? AND item_type = ? AND item_id = ?
     `).run(req.user.id, itemType, String(itemId));
 
-    res.json({
-      message: "팔로우가 해제되었습니다."
-    });
+    res.json({ message: "팔로우가 해제되었습니다." });
   } catch (error) {
     res.status(500).json({
       error: "팔로우 해제 중 오류가 발생했습니다.",
@@ -667,9 +749,7 @@ app.get("/api/likes/:itemType/:itemId", requireAuth, (req, res) => {
     const { itemType, itemId } = req.params;
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({
-        error: "좋아요 타입이 올바르지 않습니다."
-      });
+      return res.status(400).json({ error: "좋아요 타입이 올바르지 않습니다." });
     }
 
     res.json(likeInfo(req.user.id, itemType, itemId));
@@ -686,15 +766,11 @@ app.post("/api/likes", requireAuth, (req, res) => {
     const { itemType, itemId, itemName, itemMeta } = req.body;
 
     if (!itemType || !itemId || !itemName) {
-      return res.status(400).json({
-        error: "좋아요 대상 정보가 부족합니다."
-      });
+      return res.status(400).json({ error: "좋아요 대상 정보가 부족합니다." });
     }
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({
-        error: "좋아요 타입이 올바르지 않습니다."
-      });
+      return res.status(400).json({ error: "좋아요 타입이 올바르지 않습니다." });
     }
 
     const weekKey = getKoreaIsoWeekKey();
@@ -733,9 +809,7 @@ app.delete("/api/likes/:itemType/:itemId", requireAuth, (req, res) => {
     const { itemType, itemId } = req.params;
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({
-        error: "좋아요 타입이 올바르지 않습니다."
-      });
+      return res.status(400).json({ error: "좋아요 타입이 올바르지 않습니다." });
     }
 
     const weekKey = getKoreaIsoWeekKey();
@@ -763,12 +837,7 @@ app.get("/api/hot", requireAuth, (req, res) => {
 
     function getTopByType(itemType) {
       return db.prepare(`
-        SELECT
-          item_type,
-          item_id,
-          item_name,
-          item_meta,
-          COUNT(*) AS like_count
+        SELECT item_type, item_id, item_name, item_meta, COUNT(*) AS like_count
         FROM weekly_likes
         WHERE week_key = ? AND item_type = ?
         GROUP BY item_type, item_id
@@ -798,7 +867,7 @@ app.get("/api/hot", requireAuth, (req, res) => {
 });
 
 /* =========================
-   Comment API
+   Team / Player / Match Comment API
 ========================= */
 
 app.get("/api/comments/:itemType/:itemId", requireAuth, (req, res) => {
@@ -806,9 +875,7 @@ app.get("/api/comments/:itemType/:itemId", requireAuth, (req, res) => {
     const { itemType, itemId } = req.params;
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({
-        error: "댓글 타입이 올바르지 않습니다."
-      });
+      return res.status(400).json({ error: "댓글 타입이 올바르지 않습니다." });
     }
 
     res.json({
@@ -825,39 +892,24 @@ app.get("/api/comments/:itemType/:itemId", requireAuth, (req, res) => {
 
 app.post("/api/comments", requireAuth, (req, res) => {
   try {
-    const {
-      itemType,
-      itemId,
-      itemName,
-      itemMeta,
-      parentCommentId,
-      body
-    } = req.body;
+    const { itemType, itemId, itemName, itemMeta, parentCommentId, body } = req.body;
 
     if (!itemType || !itemId || !itemName || !body) {
-      return res.status(400).json({
-        error: "댓글 대상 정보와 댓글 내용을 모두 입력해야 합니다."
-      });
+      return res.status(400).json({ error: "댓글 대상 정보와 댓글 내용을 모두 입력해야 합니다." });
     }
 
     if (!["team", "player", "match"].includes(itemType)) {
-      return res.status(400).json({
-        error: "댓글 타입이 올바르지 않습니다."
-      });
+      return res.status(400).json({ error: "댓글 타입이 올바르지 않습니다." });
     }
 
     const commentBody = String(body).trim();
 
     if (commentBody.length < 1) {
-      return res.status(400).json({
-        error: "댓글 내용을 입력해야 합니다."
-      });
+      return res.status(400).json({ error: "댓글 내용을 입력해야 합니다." });
     }
 
     if (commentBody.length > 500) {
-      return res.status(400).json({
-        error: "댓글은 500자 이하로 입력해야 합니다."
-      });
+      return res.status(400).json({ error: "댓글은 500자 이하로 입력해야 합니다." });
     }
 
     const weekKey = getKoreaIsoWeekKey();
@@ -871,17 +923,10 @@ app.post("/api/comments", requireAuth, (req, res) => {
           AND item_type = ?
           AND item_id = ?
           AND week_key = ?
-      `).get(
-        Number(parentCommentId),
-        itemType,
-        String(itemId),
-        weekKey
-      );
+      `).get(Number(parentCommentId), itemType, String(itemId), weekKey);
 
       if (!parent) {
-        return res.status(400).json({
-          error: "대댓글을 달 원댓글을 찾을 수 없습니다."
-        });
+        return res.status(400).json({ error: "대댓글을 달 원댓글을 찾을 수 없습니다." });
       }
 
       normalizedParentId = Number(parentCommentId);
@@ -924,20 +969,25 @@ app.post("/api/comments", requireAuth, (req, res) => {
   }
 });
 
+app.get("/api/comment-likes/:commentId", requireAuth, (req, res) => {
+  try {
+    res.json(commentLikeInfo(req.user.id, Number(req.params.commentId)));
+  } catch (error) {
+    res.status(500).json({
+      error: "댓글 좋아요 정보를 불러오지 못했습니다.",
+      detail: error.message
+    });
+  }
+});
+
 app.post("/api/comment-likes/:commentId", requireAuth, (req, res) => {
   try {
     const commentId = Number(req.params.commentId);
 
-    const comment = db.prepare(`
-      SELECT id
-      FROM comments
-      WHERE id = ?
-    `).get(commentId);
+    const comment = db.prepare("SELECT id FROM comments WHERE id = ?").get(commentId);
 
     if (!comment) {
-      return res.status(404).json({
-        error: "댓글을 찾을 수 없습니다."
-      });
+      return res.status(404).json({ error: "댓글을 찾을 수 없습니다." });
     }
 
     const weekKey = getKoreaIsoWeekKey();
@@ -947,12 +997,7 @@ app.post("/api/comment-likes/:commentId", requireAuth, (req, res) => {
       VALUES (?, ?, ?, ?)
       ON CONFLICT(user_id, comment_id, week_key)
       DO NOTHING
-    `).run(
-      req.user.id,
-      commentId,
-      weekKey,
-      new Date().toISOString()
-    );
+    `).run(req.user.id, commentId, weekKey, new Date().toISOString());
 
     res.status(201).json({
       message: "댓글 좋아요가 반영되었습니다.",
@@ -973,9 +1018,7 @@ app.delete("/api/comment-likes/:commentId", requireAuth, (req, res) => {
 
     db.prepare(`
       DELETE FROM comment_likes
-      WHERE user_id = ?
-        AND comment_id = ?
-        AND week_key = ?
+      WHERE user_id = ? AND comment_id = ? AND week_key = ?
     `).run(req.user.id, commentId, weekKey);
 
     res.json({
@@ -1005,21 +1048,14 @@ app.get("/api/match-room/:matchId", requireAuth, (req, res) => {
       GROUP BY prediction_result
     `).all(matchId);
 
-    const stats = {
-      home: 0,
-      draw: 0,
-      away: 0
-    };
+    const stats = { home: 0, draw: 0, away: 0 };
 
     statsRows.forEach(row => {
       stats[row.result] = row.count;
     });
 
     const averageScore = db.prepare(`
-      SELECT
-        AVG(home_score) AS homeAvg,
-        AVG(away_score) AS awayAvg,
-        COUNT(*) AS count
+      SELECT AVG(home_score) AS homeAvg, AVG(away_score) AS awayAvg, COUNT(*) AS count
       FROM match_predictions
       WHERE match_id = ?
     `).get(matchId);
@@ -1059,9 +1095,7 @@ app.post("/api/match-room/:matchId/prediction", requireAuth, (req, res) => {
     const parsedAway = Number(awayScore);
 
     if (!["home", "draw", "away"].includes(predictionResult)) {
-      return res.status(400).json({
-        error: "승/무/패 예측값이 올바르지 않습니다."
-      });
+      return res.status(400).json({ error: "승/무/패 예측값이 올바르지 않습니다." });
     }
 
     if (
@@ -1072,21 +1106,13 @@ app.post("/api/match-room/:matchId/prediction", requireAuth, (req, res) => {
       parsedHome > 30 ||
       parsedAway > 30
     ) {
-      return res.status(400).json({
-        error: "스코어는 0부터 30 사이의 정수여야 합니다."
-      });
+      return res.status(400).json({ error: "스코어는 0부터 30 사이의 정수여야 합니다." });
     }
 
-    const validationError = validatePredictionAndScore(
-      predictionResult,
-      parsedHome,
-      parsedAway
-    );
+    const validationError = validatePredictionAndScore(predictionResult, parsedHome, parsedAway);
 
     if (validationError) {
-      return res.status(400).json({
-        error: validationError
-      });
+      return res.status(400).json({ error: validationError });
     }
 
     const now = new Date().toISOString();
@@ -1121,12 +1147,354 @@ app.post("/api/match-room/:matchId/prediction", requireAuth, (req, res) => {
       now
     );
 
-    res.json({
-      message: "예측이 저장되었습니다."
-    });
+    res.json({ message: "예측이 저장되었습니다." });
   } catch (error) {
     res.status(500).json({
       error: "예측 저장 중 오류가 발생했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+/* =========================
+   Board API
+========================= */
+
+app.get("/api/board/posts", requireAuth, (req, res) => {
+  try {
+    const posts = db.prepare(`
+      SELECT
+        p.id,
+        p.user_id,
+        p.title,
+        p.body,
+        p.image_url,
+        p.created_at,
+        p.updated_at,
+        u.nickname
+      FROM board_posts p
+      JOIN users u ON u.id = p.user_id
+      ORDER BY p.created_at DESC
+      LIMIT 100
+    `).all().map(post => ({
+      id: post.id,
+      userId: post.user_id,
+      title: post.title,
+      body: post.body,
+      imageUrl: post.image_url,
+      createdAt: post.created_at,
+      updatedAt: post.updated_at,
+      nickname: post.nickname,
+      like: boardPostLikeInfo(req.user.id, post.id)
+    }));
+
+    res.json({ posts });
+  } catch (error) {
+    res.status(500).json({
+      error: "게시글 목록을 불러오지 못했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.get("/api/board/hot", requireAuth, (req, res) => {
+  try {
+    const weekKey = getKoreaIsoWeekKey();
+
+    const posts = db.prepare(`
+      SELECT
+        p.id,
+        p.user_id,
+        p.title,
+        p.body,
+        p.image_url,
+        p.created_at,
+        u.nickname,
+        COUNT(l.id) AS like_count
+      FROM board_posts p
+      JOIN users u ON u.id = p.user_id
+      JOIN board_post_likes l ON l.post_id = p.id
+      WHERE l.week_key = ?
+      GROUP BY p.id
+      ORDER BY like_count DESC, p.created_at DESC
+      LIMIT 5
+    `).all(weekKey).map(post => ({
+      id: post.id,
+      userId: post.user_id,
+      title: post.title,
+      body: post.body,
+      imageUrl: post.image_url,
+      createdAt: post.created_at,
+      nickname: post.nickname,
+      likeCount: post.like_count,
+      like: boardPostLikeInfo(req.user.id, post.id)
+    }));
+
+    res.json({ weekKey, posts });
+  } catch (error) {
+    res.status(500).json({
+      error: "HOT 게시글을 불러오지 못했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.get("/api/board/posts/:postId", requireAuth, (req, res) => {
+  try {
+    const postId = Number(req.params.postId);
+
+    const post = db.prepare(`
+      SELECT
+        p.id,
+        p.user_id,
+        p.title,
+        p.body,
+        p.image_url,
+        p.created_at,
+        p.updated_at,
+        u.nickname
+      FROM board_posts p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.id = ?
+    `).get(postId);
+
+    if (!post) {
+      return res.status(404).json({ error: "게시글을 찾을 수 없습니다." });
+    }
+
+    res.json({
+      post: {
+        id: post.id,
+        userId: post.user_id,
+        title: post.title,
+        body: post.body,
+        imageUrl: post.image_url,
+        createdAt: post.created_at,
+        updatedAt: post.updated_at,
+        nickname: post.nickname,
+        like: boardPostLikeInfo(req.user.id, post.id)
+      },
+      comments: getBoardComments(req.user.id, post.id)
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "게시글을 불러오지 못했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.post("/api/board/posts", requireAuth, upload.single("image"), (req, res) => {
+  try {
+    const title = String(req.body.title || "").trim();
+    const body = String(req.body.body || "").trim();
+
+    if (title.length < 1) {
+      return res.status(400).json({ error: "제목을 입력해야 합니다." });
+    }
+
+    if (title.length > 100) {
+      return res.status(400).json({ error: "제목은 100자 이하로 입력해야 합니다." });
+    }
+
+    if (body.length < 1) {
+      return res.status(400).json({ error: "본문을 입력해야 합니다." });
+    }
+
+    if (body.length > 3000) {
+      return res.status(400).json({ error: "본문은 3000자 이하로 입력해야 합니다." });
+    }
+
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      INSERT INTO board_posts (user_id, title, body, image_url, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(req.user.id, title, body, imageUrl, now, now);
+
+    res.status(201).json({
+      message: "게시글이 등록되었습니다.",
+      postId: result.lastInsertRowid
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "게시글 등록 중 오류가 발생했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.post("/api/board/posts/:postId/like", requireAuth, (req, res) => {
+  try {
+    const postId = Number(req.params.postId);
+    const weekKey = getKoreaIsoWeekKey();
+
+    const post = db.prepare("SELECT id FROM board_posts WHERE id = ?").get(postId);
+
+    if (!post) {
+      return res.status(404).json({ error: "게시글을 찾을 수 없습니다." });
+    }
+
+    db.prepare(`
+      INSERT INTO board_post_likes (post_id, user_id, week_key, created_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(post_id, user_id, week_key)
+      DO NOTHING
+    `).run(postId, req.user.id, weekKey, new Date().toISOString());
+
+    res.json({
+      message: "게시글 좋아요가 반영되었습니다.",
+      ...boardPostLikeInfo(req.user.id, postId)
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "게시글 좋아요 처리 중 오류가 발생했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.delete("/api/board/posts/:postId/like", requireAuth, (req, res) => {
+  try {
+    const postId = Number(req.params.postId);
+    const weekKey = getKoreaIsoWeekKey();
+
+    db.prepare(`
+      DELETE FROM board_post_likes
+      WHERE post_id = ? AND user_id = ? AND week_key = ?
+    `).run(postId, req.user.id, weekKey);
+
+    res.json({
+      message: "게시글 좋아요가 취소되었습니다.",
+      ...boardPostLikeInfo(req.user.id, postId)
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "게시글 좋아요 취소 중 오류가 발생했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.post("/api/board/posts/:postId/comments", requireAuth, (req, res) => {
+  try {
+    const postId = Number(req.params.postId);
+    const { body, parentCommentId } = req.body;
+
+    const post = db.prepare("SELECT id FROM board_posts WHERE id = ?").get(postId);
+
+    if (!post) {
+      return res.status(404).json({ error: "게시글을 찾을 수 없습니다." });
+    }
+
+    const commentBody = String(body || "").trim();
+
+    if (commentBody.length < 1) {
+      return res.status(400).json({ error: "댓글 내용을 입력해야 합니다." });
+    }
+
+    if (commentBody.length > 500) {
+      return res.status(400).json({ error: "댓글은 500자 이하로 입력해야 합니다." });
+    }
+
+    let normalizedParentId = null;
+
+    if (parentCommentId) {
+      const parent = db.prepare(`
+        SELECT id
+        FROM board_comments
+        WHERE id = ? AND post_id = ?
+      `).get(Number(parentCommentId), postId);
+
+      if (!parent) {
+        return res.status(400).json({ error: "대댓글을 달 원댓글을 찾을 수 없습니다." });
+      }
+
+      normalizedParentId = Number(parentCommentId);
+    }
+
+    const result = db.prepare(`
+      INSERT INTO board_comments (post_id, user_id, parent_comment_id, body, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      postId,
+      req.user.id,
+      normalizedParentId,
+      commentBody,
+      new Date().toISOString()
+    );
+
+    res.status(201).json({
+      message: "댓글이 등록되었습니다.",
+      commentId: result.lastInsertRowid
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "댓글 등록 중 오류가 발생했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.get("/api/board/comments/:commentId/like", requireAuth, (req, res) => {
+  try {
+    res.json(boardCommentLikeInfo(req.user.id, Number(req.params.commentId)));
+  } catch (error) {
+    res.status(500).json({
+      error: "댓글 좋아요 정보를 불러오지 못했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.post("/api/board/comments/:commentId/like", requireAuth, (req, res) => {
+  try {
+    const commentId = Number(req.params.commentId);
+    const weekKey = getKoreaIsoWeekKey();
+
+    const comment = db.prepare("SELECT id FROM board_comments WHERE id = ?").get(commentId);
+
+    if (!comment) {
+      return res.status(404).json({ error: "댓글을 찾을 수 없습니다." });
+    }
+
+    db.prepare(`
+      INSERT INTO board_comment_likes (comment_id, user_id, week_key, created_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(comment_id, user_id, week_key)
+      DO NOTHING
+    `).run(commentId, req.user.id, weekKey, new Date().toISOString());
+
+    res.json({
+      message: "댓글 좋아요가 반영되었습니다.",
+      ...boardCommentLikeInfo(req.user.id, commentId)
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "댓글 좋아요 처리 중 오류가 발생했습니다.",
+      detail: error.message
+    });
+  }
+});
+
+app.delete("/api/board/comments/:commentId/like", requireAuth, (req, res) => {
+  try {
+    const commentId = Number(req.params.commentId);
+    const weekKey = getKoreaIsoWeekKey();
+
+    db.prepare(`
+      DELETE FROM board_comment_likes
+      WHERE comment_id = ? AND user_id = ? AND week_key = ?
+    `).run(commentId, req.user.id, weekKey);
+
+    res.json({
+      message: "댓글 좋아요가 취소되었습니다.",
+      ...boardCommentLikeInfo(req.user.id, commentId)
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "댓글 좋아요 취소 중 오류가 발생했습니다.",
       detail: error.message
     });
   }
@@ -1188,7 +1556,6 @@ app.get("/api/matches/:competition", async (req, res) => {
 
     const today = new Date();
     const after30Days = new Date();
-
     after30Days.setDate(today.getDate() + 30);
 
     const dateFrom = req.query.dateFrom || formatDate(today);
@@ -1399,6 +1766,12 @@ app.get("/api/player/:playerId", async (req, res) => {
       detail: error.message
     });
   }
+});
+
+app.use((error, req, res, next) => {
+  res.status(400).json({
+    error: error.message || "요청 처리 중 오류가 발생했습니다."
+  });
 });
 
 app.listen(PORT, () => {
